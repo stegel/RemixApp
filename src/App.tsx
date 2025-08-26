@@ -6,57 +6,95 @@ import { AdminLogin } from "./components/AdminLogin";
 import { Toaster } from "./components/ui/sonner";
 import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
-import { BarChart3, ClipboardList, Home, Settings, LogOut } from "lucide-react";
+import {
+  BarChart3,
+  ClipboardList,
+  Home,
+  Settings,
+  LogOut,
+} from "lucide-react";
+import navLogo from "figma:asset/27c0a819fb0f073a52b84d71b730ef7164a6f413.png";
+import bannerLogo from "figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'judge' | 'results' | 'admin' | 'admin-login'>('home');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [currentView, setCurrentView] = useState<
+    "home" | "judge" | "results" | "admin" | "admin-login"
+  >("home");
+  const [isAdminAuthenticated, setIsAdminAuthenticated] =
+    useState(false);
 
   const handleAdminAccess = () => {
     if (isAdminAuthenticated) {
-      setCurrentView('admin');
+      setCurrentView("admin");
     } else {
-      setCurrentView('admin-login');
+      setCurrentView("admin-login");
     }
   };
 
   const handleAdminLogin = () => {
     setIsAdminAuthenticated(true);
-    setCurrentView('admin');
+    setCurrentView("admin");
   };
 
   const handleAdminLogout = () => {
     setIsAdminAuthenticated(false);
-    setCurrentView('home');
+    setCurrentView("home");
   };
 
   const renderView = () => {
     switch (currentView) {
-      case 'judge':
+      case "judge":
         return <JudgingForm />;
-      case 'results':
+      case "results":
         return <ResultsDashboard />;
-      case 'admin':
-        return isAdminAuthenticated ? <AdminPage /> : <AdminLogin onLogin={handleAdminLogin} onCancel={() => setCurrentView('home')} />;
-      case 'admin-login':
-        return <AdminLogin onLogin={handleAdminLogin} onCancel={() => setCurrentView('home')} />;
+      case "admin":
+        return isAdminAuthenticated ? (
+          <AdminPage />
+        ) : (
+          <AdminLogin
+            onLogin={handleAdminLogin}
+            onCancel={() => setCurrentView("home")}
+          />
+        );
+      case "admin-login":
+        return (
+          <AdminLogin
+            onLogin={handleAdminLogin}
+            onCancel={() => setCurrentView("home")}
+          />
+        );
       default:
         return (
           <div className="max-w-4xl mx-auto space-y-6">
+            {/* Banner Logo */}
+            <div className="text-center mb-8">
+              <img
+                src={bannerLogo}
+                alt="ServiceNow ReMix"
+                className="mx-auto mb-6 h-20 w-auto"
+              />
+            </div>
+
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center mb-8">
-                  <h2 className="mb-2">Welcome to the Judging System</h2>
+                  <h2 className="mb-2">
+                    AI in The Mix: Experience Simulation
+                  </h2>
+                  <h3 className="mb-4">Team evaluations</h3>
                   <p className="text-muted-foreground">
-                    Choose an action below to get started
+                    Please complete the evaluation form for each
+                    team presentation you watch. Each member of
+                    your team should complete their own
+                    evaluation of each team.
                   </p>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Button
                     variant="outline"
                     className="h-32 flex-col space-y-2"
-                    onClick={() => setCurrentView('judge')}
+                    onClick={() => setCurrentView("judge")}
                   >
                     <ClipboardList className="w-8 h-8" />
                     <div className="text-center">
@@ -66,11 +104,11 @@ export default function App() {
                       </div>
                     </div>
                   </Button>
-                  
+
                   <Button
                     variant="outline"
                     className="h-32 flex-col space-y-2"
-                    onClick={() => setCurrentView('results')}
+                    onClick={() => setCurrentView("results")}
                   >
                     <BarChart3 className="w-8 h-8" />
                     <div className="text-center">
@@ -80,56 +118,6 @@ export default function App() {
                       </div>
                     </div>
                   </Button>
-
-                  <Button
-                    variant="outline"
-                    className="h-32 flex-col space-y-2"
-                    onClick={handleAdminAccess}
-                  >
-                    <Settings className="w-8 h-8" />
-                    <div className="text-center">
-                      <div>Administration</div>
-                      <div className="text-sm text-muted-foreground">
-                        {isAdminAuthenticated ? 'Manage teams and evaluations' : 'Password protected'}
-                      </div>
-                    </div>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="mb-4">Evaluation Criteria</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <h4 className="mb-2">AI Tools Usage</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Rate 11 specific AI tool categories on a 0-3 scale (0=Did not use, 3=Exemplary usage). 
-                      Categories include research synthesis, transcript review, design concepts, documentation, and more.
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="mb-2">Solution Clarity</h4>
-                    <p className="text-sm text-muted-foreground">
-                      How clearly the team's presentation described their proposed solution and how AI contributed to the outcome. 
-                      Rated as Did not demonstrate, Basic, Thoughtful, or Extraordinary.
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="mb-2">EX Roles Impact</h4>
-                    <p className="text-sm text-muted-foreground">
-                      How well the team demonstrates how experience roles (content, research, design) contribute to better outcomes. 
-                      Rated as Did not demonstrate, Basic, Thoughtful, or Extraordinary.
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="mb-2">Learning Impact</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Simple yes/no question: "I learned a new technique from the team's presentation." 
-                      Helps measure educational value.
-                    </p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -139,51 +127,87 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Navigation */}
       <nav className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <h1 className="text-xl">Experience Simulation</h1>
-              <span className="text-sm text-muted-foreground">Presentation Judging System</span>
+            <div className="flex items-center space-x-4">
+              <img
+                src={navLogo}
+                alt="ServiceNow"
+                className="h-8 w-8"
+              />
+              <div className="hidden md:flex flex-col">
+                <span className="text-lg">ReMix 2025</span>
+                <span className="text-sm text-muted-foreground">
+                  AI in the Mix: Experience Simulation
+                </span>
+              </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
-              <Button 
-                variant={currentView === 'home' ? 'default' : 'ghost'}
+              <Button
+                variant={
+                  currentView === "home" ? "default" : "ghost"
+                }
                 size="sm"
-                onClick={() => setCurrentView('home')}
+                onClick={() => setCurrentView("home")}
               >
                 <Home className="w-4 h-4 mr-2" />
                 Home
               </Button>
-              <Button 
-                variant={currentView === 'judge' ? 'default' : 'ghost'}
+              <Button
+                variant={
+                  currentView === "judge" ? "default" : "ghost"
+                }
                 size="sm"
-                onClick={() => setCurrentView('judge')}
+                onClick={() => setCurrentView("judge")}
               >
                 <ClipboardList className="w-4 h-4 mr-2" />
                 Judge
               </Button>
-              <Button 
-                variant={currentView === 'results' ? 'default' : 'ghost'}
+              <Button
+                variant={
+                  currentView === "results"
+                    ? "default"
+                    : "ghost"
+                }
                 size="sm"
-                onClick={() => setCurrentView('results')}
+                onClick={() => setCurrentView("results")}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Results
               </Button>
-              <Button 
-                variant={currentView === 'admin' || currentView === 'admin-login' ? 'default' : 'ghost'}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8 flex-1">
+        {renderView()}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-muted/30">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-muted-foreground">
+              © 2025 ServiceNow EXperience Organization
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={handleAdminAccess}
+                className="text-muted-foreground hover:text-foreground"
               >
                 <Settings className="w-4 h-4 mr-2" />
-                Admin
+                Administration
               </Button>
               {isAdminAuthenticated && (
-                <Button 
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleAdminLogout}
@@ -196,12 +220,7 @@ export default function App() {
             </div>
           </div>
         </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {renderView()}
-      </main>
+      </footer>
 
       <Toaster />
     </div>

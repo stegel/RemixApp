@@ -6,6 +6,14 @@ export const supabase = createClient(
   publicAnonKey
 );
 
+export interface DatabaseTeam {
+  id: string;
+  team_number: number;
+  team_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database types based on our schema
 export interface DatabaseEvaluation {
   id: string;

@@ -8,34 +8,64 @@ import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
-import { Plus, Trash2, Users, FileText, AlertTriangle, RefreshCw, Shield } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Plus, Trash2, Users, FileText, AlertTriangle, RefreshCw, Shield, Edit, Upload, Download } from "lucide-react";
 import { toast } from "sonner@2.0.3";
 import { api, Evaluation, EVALUATION_SCALE_VALUES } from "../utils/api";
+import { getTeamDisplayName } from "../utils/teamUtils";
+import { DatabaseMigrationNotice } from "./DatabaseMigrationNotice";
 
 interface Team {
   id: string;
-  name: string;
+  team_number: number;
+  team_name?: string;
   created_at: string;
 }
 
 export function AdminPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [newTeamNumber, setNewTeamNumber] = useState("");
   const [newTeamName, setNewTeamName] = useState("");
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [editTeamNumber, setEditTeamNumber] = useState("");
+  const [editTeamName, setEditTeamName] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [teamEvaluationCounts, setTeamEvaluationCounts] = useState<Record<string, number>>({});
+  const [isLegacyMode, setIsLegacyMode] = useState(false);
+  const [showMigrationNotice, setShowMigrationNotice] = useState(true);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<{ teamNumber: number; teamName?: string }[]>([]);
 
   const fetchTeams = async () => {
     try {
       const result = await api.getTeams();
       setTeams(result.teams);
       
+      // Check if we're in legacy mode by testing for the new schema columns
+      try {
+        const { supabase } = await import('../utils/supabase/client');
+        const { error } = await supabase
+          .from('teams')
+          .select('team_number, team_name')
+          .limit(1);
+        
+        // If error code is 42703, it means the columns don't exist (legacy mode)
+        setIsLegacyMode(error?.code === '42703');
+      } catch (schemaError) {
+        // If there's an error testing the schema, assume we're not in legacy mode
+        console.log('Schema test error:', schemaError);
+        setIsLegacyMode(false);
+      }
+      
       // Get evaluation counts for each team
       const counts: Record<string, number> = {};
       for (const team of result.teams) {
-        const count = await api.getEvaluationCountByTeam(team.name);
-        counts[team.name] = count;
+        const teamDisplayName = getTeamDisplayName(team.team_number, team.team_name);
+        const count = await api.getEvaluationCountByTeam(teamDisplayName);
+        counts[teamDisplayName] = count;
       }
       setTeamEvaluationCounts(counts);
     } catch (error) {
@@ -77,19 +107,29 @@ export function AdminPage() {
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newTeamName.trim()) {
-      toast.error("Please enter a team name");
+    const teamNumber = parseInt(newTeamNumber.trim());
+    if (!newTeamNumber.trim() || isNaN(teamNumber) || teamNumber <= 0) {
+      toast.error("Please enter a valid team number");
       return;
     }
 
-    // Check if team name already exists
-    if (teams.some(team => team.name.toLowerCase() === newTeamName.trim().toLowerCase())) {
+    // Check if team number already exists
+    if (teams.some(team => team.team_number === teamNumber)) {
+      toast.error("A team with this number already exists");
+      return;
+    }
+
+    // Check if team name already exists (if provided)
+    if (newTeamName.trim() && teams.some(team => 
+      team.team_name && team.team_name.toLowerCase() === newTeamName.trim().toLowerCase()
+    )) {
       toast.error("A team with this name already exists");
       return;
     }
 
     try {
-      await api.addTeam(newTeamName);
+      await api.addTeam(teamNumber, newTeamName.trim() || undefined);
+      setNewTeamNumber("");
       setNewTeamName("");
       await fetchTeams();
       toast.success("Team added successfully");
@@ -99,12 +139,57 @@ export function AdminPage() {
     }
   };
 
-  const handleDeleteTeam = async (teamId: string, teamName: string) => {
+  const handleEditTeam = (team: Team) => {
+    setEditingTeam(team);
+    setEditTeamNumber(team.team_number.toString());
+    setEditTeamName(team.team_name || "");
+  };
+
+  const handleUpdateTeam = async () => {
+    if (!editingTeam) return;
+    
+    const teamNumber = parseInt(editTeamNumber.trim());
+    if (!editTeamNumber.trim() || isNaN(teamNumber) || teamNumber <= 0) {
+      toast.error("Please enter a valid team number");
+      return;
+    }
+
+    // Check if team number already exists (excluding current team)
+    if (teams.some(team => team.id !== editingTeam.id && team.team_number === teamNumber)) {
+      toast.error("A team with this number already exists");
+      return;
+    }
+
+    // Check if team name already exists (excluding current team, if provided)
+    if (editTeamName.trim() && teams.some(team => 
+      team.id !== editingTeam.id && 
+      team.team_name && 
+      team.team_name.toLowerCase() === editTeamName.trim().toLowerCase()
+    )) {
+      toast.error("A team with this name already exists");
+      return;
+    }
+
     try {
-      const evaluationCount = teamEvaluationCounts[teamName] || 0;
+      await api.updateTeam(editingTeam.id, teamNumber, editTeamName.trim() || undefined);
+      setEditingTeam(null);
+      setEditTeamNumber("");
+      setEditTeamName("");
+      await fetchTeams();
+      toast.success("Team updated successfully");
+    } catch (error) {
+      console.error('Error updating team:', error);
+      toast.error("Failed to update team");
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string, teamNumber: number, teamName?: string) => {
+    const teamDisplay = getTeamDisplayName(teamNumber, teamName);
+    try {
+      const evaluationCount = teamEvaluationCounts[teamDisplay] || 0;
       
       if (evaluationCount > 0) {
-        toast.error(`Cannot delete team "${teamName}" because it has ${evaluationCount} evaluation(s). Delete the evaluations first.`);
+        toast.error(`Cannot delete ${teamDisplay} because it has ${evaluationCount} evaluation(s). Delete the evaluations first.`);
         return;
       }
 
@@ -139,6 +224,178 @@ export function AdminPage() {
 
   const formatScore = (score: number, decimals: number = 1) => score.toFixed(decimals);
 
+  const parseCsvFile = (file: File): Promise<{ teamNumber: number; teamName?: string }[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+          
+          if (lines.length === 0) {
+            reject(new Error('CSV file is empty'));
+            return;
+          }
+
+          const teams: { teamNumber: number; teamName?: string }[] = [];
+          let startIndex = 0;
+
+          // Check if first line is a header
+          const firstLine = lines[0].toLowerCase();
+          if (firstLine.includes('team_number') || firstLine.includes('number') || firstLine.includes('name')) {
+            startIndex = 1;
+          }
+
+          for (let i = startIndex; i < lines.length; i++) {
+            const line = lines[i];
+            const columns = line.split(',').map(col => col.trim().replace(/^["']|["']$/g, ''));
+            
+            if (columns.length === 0 || !columns[0]) continue;
+
+            const teamNumber = parseInt(columns[0]);
+            if (isNaN(teamNumber) || teamNumber <= 0) {
+              reject(new Error(`Invalid team number "${columns[0]}" on line ${i + 1}`));
+              return;
+            }
+
+            const teamName = columns[1] && columns[1].trim() ? columns[1].trim() : undefined;
+
+            teams.push({ teamNumber, teamName });
+          }
+
+          if (teams.length === 0) {
+            reject(new Error('No valid team data found in CSV'));
+            return;
+          }
+
+          // Check for duplicate team numbers in CSV
+          const teamNumbers = teams.map(t => t.teamNumber);
+          const duplicates = teamNumbers.filter((num, index) => teamNumbers.indexOf(num) !== index);
+          if (duplicates.length > 0) {
+            reject(new Error(`Duplicate team numbers found in CSV: ${duplicates.join(', ')}`));
+            return;
+          }
+
+          resolve(teams);
+        } catch (error) {
+          reject(new Error(`Failed to parse CSV: ${error.message}`));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleCsvFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setCsvFile(null);
+      setCsvPreview([]);
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+
+    try {
+      setCsvFile(file);
+      const teams = await parseCsvFile(file);
+      setCsvPreview(teams);
+      toast.success(`Parsed ${teams.length} teams from CSV`);
+    } catch (error) {
+      console.error('Error parsing CSV:', error);
+      toast.error(error.message);
+      setCsvFile(null);
+      setCsvPreview([]);
+    }
+  };
+
+  const handleCsvImport = async () => {
+    if (!csvFile || csvPreview.length === 0) {
+      toast.error('No CSV data to import');
+      return;
+    }
+
+    setCsvImporting(true);
+    try {
+      let successCount = 0;
+      let skippedCount = 0;
+      const errors: string[] = [];
+
+      for (const team of csvPreview) {
+        try {
+          // Check if team number already exists
+          if (teams.some(existingTeam => existingTeam.team_number === team.teamNumber)) {
+            skippedCount++;
+            console.log(`Skipped team ${team.teamNumber} (already exists)`);
+            continue;
+          }
+
+          // Check if team name already exists (if provided)
+          if (team.teamName && teams.some(existingTeam => 
+            existingTeam.team_name && 
+            existingTeam.team_name.toLowerCase() === team.teamName.toLowerCase()
+          )) {
+            skippedCount++;
+            console.log(`Skipped team ${team.teamNumber} (name "${team.teamName}" already exists)`);
+            continue;
+          }
+
+          await api.addTeam(team.teamNumber, team.teamName);
+          successCount++;
+        } catch (error) {
+          console.error(`Error adding team ${team.teamNumber}:`, error);
+          errors.push(`Team ${team.teamNumber}: ${error.message}`);
+        }
+      }
+
+      // Reset form
+      setCsvFile(null);
+      setCsvPreview([]);
+      const fileInput = document.getElementById('csv-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      // Refresh teams list
+      await fetchTeams();
+
+      // Show results
+      if (successCount > 0) {
+        toast.success(`Successfully imported ${successCount} team(s)`);
+      }
+      
+      if (skippedCount > 0) {
+        toast.warning(`Skipped ${skippedCount} team(s) (already exist)`);
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Failed to import ${errors.length} team(s). Check console for details.`);
+        console.error('Import errors:', errors);
+      }
+
+    } catch (error) {
+      console.error('Error during CSV import:', error);
+      toast.error('Failed to import teams from CSV');
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const csvContent = "team_number,team_name\n1,Team Alpha\n2,Team Beta\n3,\n4,Team Delta";
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teams_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    toast.success('Template downloaded');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -152,6 +409,11 @@ export function AdminPage() {
 
   return (
     <div className="space-y-6">
+      {/* Migration Notice */}
+      {isLegacyMode && showMigrationNotice && (
+        <DatabaseMigrationNotice onDismiss={() => setShowMigrationNotice(false)} />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center space-x-2 mb-2">
@@ -183,22 +445,37 @@ export function AdminPage() {
                 Add New Team
               </CardTitle>
               <CardDescription>
-                Create a new team that judges can evaluate
+                Create a new team with a number (required) and optional name that judges can evaluate
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleAddTeam} className="flex gap-4">
-                <div className="flex-1">
-                  <Label htmlFor="team-name">Team Name</Label>
-                  <Input
-                    id="team-name"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    placeholder="Enter team name"
-                    className="mt-1"
-                  />
+              <form onSubmit={handleAddTeam} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="team-number">Team Number *</Label>
+                    <Input
+                      id="team-number"
+                      type="number"
+                      min="1"
+                      value={newTeamNumber}
+                      onChange={(e) => setNewTeamNumber(e.target.value)}
+                      placeholder="Enter team number"
+                      className="mt-1"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="team-name">Team Name (Optional)</Label>
+                    <Input
+                      id="team-name"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      placeholder="Enter team name"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-end">
+                <div className="flex justify-end">
                   <Button type="submit">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Team
@@ -210,9 +487,92 @@ export function AdminPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center">
+                <Upload className="w-5 h-5 mr-2" />
+                Import Teams from CSV
+              </CardTitle>
+              <CardDescription>
+                Upload a CSV file with team numbers and optional team names. Format: team_number,team_name
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={downloadCsvTemplate}
+                    className="flex items-center"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Template
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Download a sample CSV format to get started
+                  </span>
+                </div>
+                
+                <div>
+                  <Label htmlFor="csv-file">CSV File</Label>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCsvFileChange}
+                    className="mt-1"
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    CSV format: team_number,team_name (team_name is optional)
+                  </p>
+                </div>
+
+                {csvPreview.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Preview ({csvPreview.length} teams)</Label>
+                    <div className="max-h-40 overflow-y-auto border rounded p-2 bg-muted/30">
+                      {csvPreview.slice(0, 10).map((team, index) => (
+                        <div key={index} className="text-sm flex justify-between py-1">
+                          <span>Team {team.teamNumber}</span>
+                          <span className="text-muted-foreground">
+                            {team.teamName || '(no name)'}
+                          </span>
+                        </div>
+                      ))}
+                      {csvPreview.length > 10 && (
+                        <div className="text-sm text-muted-foreground pt-1 border-t">
+                          ... and {csvPreview.length - 10} more teams
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleCsvImport}
+                    disabled={csvPreview.length === 0 || csvImporting}
+                  >
+                    {csvImporting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Teams
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Existing Teams ({teams.length})</CardTitle>
               <CardDescription>
-                Manage teams and view evaluation counts
+                Manage teams with numbers and names, view evaluation counts
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -223,54 +583,112 @@ export function AdminPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {teams.map((team) => (
-                    <div key={team.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h4>{team.name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Created {new Date(team.created_at).toLocaleDateString()}
-                          </p>
+                  {teams.map((team) => {
+                    const teamDisplay = getTeamDisplayName(team.team_number, team.team_name);
+                    const evaluationCount = teamEvaluationCounts[teamDisplay] || 0;
+                    
+                    return (
+                      <div key={team.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div>
+                            <h4>{teamDisplay}</h4>
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                              <span>#{team.team_number}</span>
+                              {team.team_name && <span>• {team.team_name}</span>}
+                              <span>• Created {new Date(team.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <Badge variant="secondary">
+                            {evaluationCount} evaluation(s)
+                          </Badge>
                         </div>
-                        <Badge variant="secondary">
-                          {teamEvaluationCounts[team.name] || 0} evaluation(s)
-                        </Badge>
+                        <div className="flex items-center space-x-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" onClick={() => handleEditTeam(team)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit Team</DialogTitle>
+                                <DialogDescription>
+                                  Update the team number and name. The team number is required.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <Label htmlFor="edit-team-number">Team Number *</Label>
+                                  <Input
+                                    id="edit-team-number"
+                                    type="number"
+                                    min="1"
+                                    value={editTeamNumber}
+                                    onChange={(e) => setEditTeamNumber(e.target.value)}
+                                    placeholder="Enter team number"
+                                    className="mt-1"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-team-name">Team Name (Optional)</Label>
+                                  <Input
+                                    id="edit-team-name"
+                                    value={editTeamName}
+                                    onChange={(e) => setEditTeamName(e.target.value)}
+                                    placeholder="Enter team name"
+                                    className="mt-1"
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setEditingTeam(null)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleUpdateTeam}>
+                                  Update Team
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {teamDisplay}? 
+                                  {evaluationCount > 0 && (
+                                    <span className="block mt-2 text-destructive">
+                                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                                      This team has {evaluationCount} evaluation(s). 
+                                      Delete those evaluations first.
+                                    </span>
+                                  )}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTeam(team.id, team.team_number, team.team_name)}
+                                  disabled={evaluationCount > 0}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Team
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Team</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete team "{team.name}"? 
-                              {teamEvaluationCounts[team.name] > 0 && (
-                                <span className="block mt-2 text-destructive">
-                                  <AlertTriangle className="w-4 h-4 inline mr-1" />
-                                  This team has {teamEvaluationCounts[team.name]} evaluation(s). 
-                                  Delete those evaluations first.
-                                </span>
-                              )}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteTeam(team.id, team.name)}
-                              disabled={teamEvaluationCounts[team.name] > 0}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete Team
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

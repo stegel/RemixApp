@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Slider } from "./ui/slider";
+
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner@2.0.3";
 import { api, JudgingSubmission, AI_TOOLS_CATEGORIES, AI_TOOLS_SCALE_LABELS, EVALUATION_SCALE_LABELS, EVALUATION_SCALE_VALUES } from "../utils/api";
+import { getTeamDisplayName } from "../utils/teamUtils";
 
 interface AIToolsScores {
   synthesizingResearch: number;
@@ -36,7 +37,7 @@ interface JudgingCriteria {
 export function JudgingForm() {
   const [teamName, setTeamName] = useState("");
   const [judgeName, setJudgeName] = useState("");
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teams, setTeams] = useState<{ id: string; team_number: number; team_name?: string }[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [scores, setScores] = useState<JudgingCriteria>({
     aiToolsScores: {
@@ -293,11 +294,14 @@ export function JudgingForm() {
                     <SelectValue placeholder="Select a team to judge" />
                   </SelectTrigger>
                   <SelectContent>
-                    {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.name}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
+                    {teams.map((team) => {
+                      const displayName = getTeamDisplayName(team.team_number, team.team_name);
+                      return (
+                        <SelectItem key={team.id} value={displayName}>
+                          {displayName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (
@@ -339,37 +343,34 @@ export function JudgingForm() {
                       {scores.aiToolsScores[category.key]}/3
                     </Badge>
                   </div>
-                  <Slider
-                    value={[scores.aiToolsScores[category.key]]}
-                    onValueChange={(value) => updateAIToolScore(category.key, value)}
-                    min={0}
-                    max={3}
-                    step={1}
-                    className="w-full"
+                  <RadioGroup
+                    value={scores.aiToolsScores[category.key].toString()}
+                    onValueChange={(value) => updateAIToolScore(category.key, [parseInt(value)])}
                     disabled={isSubmitting}
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Did not use (0)</span>
-                    <span>Exemplary (3)</span>
-                  </div>
+                    className="flex flex-col space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="0" id={`${category.key}-0`} />
+                      <Label htmlFor={`${category.key}-0`} className="text-sm">Did not use (0)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id={`${category.key}-1`} />
+                      <Label htmlFor={`${category.key}-1`} className="text-sm">Basic usage (1)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="2" id={`${category.key}-2`} />
+                      <Label htmlFor={`${category.key}-2`} className="text-sm">Good usage (2)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="3" id={`${category.key}-3`} />
+                      <Label htmlFor={`${category.key}-3`} className="text-sm">Exemplary usage (3)</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
               ))}
             </div>
 
-            {/* AI Tools Summary */}
-            <div className="bg-muted p-4 rounded-lg">
-              <h4 className="mb-3">AI Tools Summary</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Score</p>
-                  <p className="text-xl">{calculateAIToolsTotal()}/33</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Average Score</p>
-                  <p className="text-xl">{calculateAIToolsAverage()}/3</p>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           <Separator />
@@ -485,14 +486,7 @@ export function JudgingForm() {
             />
           </div>
 
-          {/* Overall Score Summary */}
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="mb-3">Score Summary</h4>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Total Score</p>
-              <p className="text-xl">{calculateTotalScore()}</p>
-            </div>
-          </div>
+
 
           <Button type="submit" className="w-full" disabled={isSubmitting || teams.length === 0}>
             {isSubmitting ? "Submitting..." : "Submit Evaluation"}

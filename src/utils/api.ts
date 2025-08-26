@@ -1,4 +1,5 @@
 import { supabase, TOOL_KEY_TO_ENUM, ENUM_TO_TOOL_KEY, DatabaseEvaluation, DatabaseAIToolScore, DatabaseTeamSummary } from './supabase/client';
+import { getTeamDisplayName } from './teamUtils';
 
 interface AIToolsScores {
   synthesizingResearch: number;
@@ -55,6 +56,50 @@ export interface TeamSummary {
   learnedNewTechniqueCount: number;
   learnedNewTechniquePercentage: number;
   evaluations: Evaluation[];
+}
+
+// Helper function to get current valid team names
+async function getCurrentValidTeamNames(): Promise<Set<string>> {
+  try {
+    // First try the new schema, fall back to old schema
+    let { data: teams, error } = await supabase
+      .from('teams')
+      .select('id, team_number, team_name, created_at')
+      .order('team_number', { ascending: true });
+
+    // If new schema fails, try old schema
+    if (error && error.code === '42703') {
+      console.log('Using legacy team schema with name column');
+      const { data: legacyTeams, error: legacyError } = await supabase
+        .from('teams')
+        .select('id, name, created_at')
+        .order('name', { ascending: true });
+
+      if (legacyError) {
+        console.error('Error fetching teams with legacy schema:', legacyError);
+        throw new Error(`Failed to fetch teams: ${legacyError.message}`);
+      }
+
+      // Convert legacy format to new format
+      teams = legacyTeams?.map((team, index) => ({
+        id: team.id,
+        team_number: index + 1, // Assign sequential numbers
+        team_name: team.name,
+        created_at: team.created_at
+      })) || [];
+    } else if (error) {
+      console.error('Error fetching teams:', error);
+      throw new Error(`Failed to fetch teams: ${error.message}`);
+    }
+
+    // Create set of valid team display names
+    return new Set(
+      (teams || []).map(team => getTeamDisplayName(team.team_number, team.team_name))
+    );
+  } catch (error) {
+    console.error('Error getting valid team names:', error);
+    return new Set();
+  }
 }
 
 // Helper function to convert database evaluation to API format
@@ -163,8 +208,16 @@ export const api = {
         throw new Error(`Failed to fetch evaluations: ${evalError.message}`);
       }
 
-      // Get all AI tool scores
-      const evaluationIds = evaluations?.map(e => e.id) || [];
+      // Get current teams to filter against
+      const validTeamNames = await getCurrentValidTeamNames();
+
+      // Filter evaluations to only include teams that still exist
+      const filteredEvaluations = evaluations?.filter(evaluation => 
+        validTeamNames.has(evaluation.team_name)
+      ) || [];
+
+      // Get all AI tool scores for filtered evaluations
+      const evaluationIds = filteredEvaluations.map(e => e.id);
       if (evaluationIds.length === 0) {
         return { evaluations: [] };
       }
@@ -189,7 +242,7 @@ export const api = {
       });
 
       // Convert to API format
-      const apiEvaluations = evaluations.map(dbEval => 
+      const apiEvaluations = filteredEvaluations.map(dbEval => 
         convertDatabaseEvaluationToAPI(dbEval, scoresByEvaluation[dbEval.id] || [])
       );
 
@@ -203,6 +256,14 @@ export const api = {
   // Get evaluations by team
   getTeamEvaluations: async (teamName: string): Promise<{ evaluations: Evaluation[] }> => {
     try {
+      // First check if the team still exists
+      const validTeamNames = await getCurrentValidTeamNames();
+
+      // If the team doesn't exist anymore, return empty
+      if (!validTeamNames.has(teamName)) {
+        return { evaluations: [] };
+      }
+
       // Get evaluations for specific team
       const { data: evaluations, error: evalError } = await supabase
         .from('evaluations')
@@ -255,6 +316,9 @@ export const api = {
   // Get team summary/leaderboard using the database view
   getTeamSummary: async (): Promise<{ teams: TeamSummary[] }> => {
     try {
+      // Get the list of current teams to filter against
+      const validTeamNames = await getCurrentValidTeamNames();
+
       // Get team summaries from the view
       const { data: teamSummaries, error: summaryError } = await supabase
         .from('team_summaries')
@@ -266,6 +330,11 @@ export const api = {
         throw new Error(`Failed to fetch team summaries: ${summaryError.message}`);
       }
 
+      // Filter team summaries to only include teams that still exist
+      const filteredTeamSummaries = teamSummaries?.filter(summary => 
+        validTeamNames.has(summary.team_name)
+      ) || [];
+
       // Get detailed AI tool averages for each team
       const { data: aiToolAverages, error: toolError } = await supabase
         .from('team_ai_tool_averages')
@@ -276,23 +345,25 @@ export const api = {
         throw new Error(`Failed to fetch AI tool averages: ${toolError.message}`);
       }
 
-      // Group AI tool averages by team
+      // Group AI tool averages by team (only for existing teams)
       const toolAveragesByTeam: Record<string, Record<string, number>> = {};
       aiToolAverages?.forEach(avg => {
-        if (!toolAveragesByTeam[avg.team_name]) {
-          toolAveragesByTeam[avg.team_name] = {};
-        }
-        const toolKey = ENUM_TO_TOOL_KEY[avg.tool_category];
-        if (toolKey) {
-          toolAveragesByTeam[avg.team_name][toolKey] = avg.avg_score;
+        if (validTeamNames.has(avg.team_name)) {
+          if (!toolAveragesByTeam[avg.team_name]) {
+            toolAveragesByTeam[avg.team_name] = {};
+          }
+          const toolKey = ENUM_TO_TOOL_KEY[avg.tool_category];
+          if (toolKey) {
+            toolAveragesByTeam[avg.team_name][toolKey] = avg.avg_score;
+          }
         }
       });
 
       // Get all evaluations for each team (for detailed view)
       const allEvaluationsResult = await api.getEvaluations();
 
-      // Convert to API format
-      const apiTeamSummaries: TeamSummary[] = teamSummaries?.map(summary => {
+      // Convert to API format (only for existing teams)
+      const apiTeamSummaries: TeamSummary[] = filteredTeamSummaries.map(summary => {
         const teamEvaluations = allEvaluationsResult.evaluations.filter(
           evaluation => evaluation.teamName === summary.team_name
         );
@@ -327,7 +398,7 @@ export const api = {
           learnedNewTechniquePercentage: summary.learned_new_technique_percentage,
           evaluations: teamEvaluations,
         };
-      }) || [];
+      });
 
       return { teams: apiTeamSummaries };
     } catch (error) {
@@ -381,14 +452,35 @@ export const api = {
   },
 
   // Team management functions
-  getTeams: async (): Promise<{ teams: { id: string; name: string; created_at: string }[] }> => {
+  getTeams: async (): Promise<{ teams: { id: string; team_number: number; team_name?: string; created_at: string }[] }> => {
     try {
-      const { data: teams, error } = await supabase
+      // First try the new schema, fall back to old schema
+      let { data: teams, error } = await supabase
         .from('teams')
-        .select('id, name, created_at')
-        .order('name', { ascending: true });
+        .select('id, team_number, team_name, created_at')
+        .order('team_number', { ascending: true });
 
-      if (error) {
+      // If new schema fails, try old schema
+      if (error && error.code === '42703') {
+        console.log('Using legacy team schema with name column');
+        const { data: legacyTeams, error: legacyError } = await supabase
+          .from('teams')
+          .select('id, name, created_at')
+          .order('name', { ascending: true });
+
+        if (legacyError) {
+          console.error('Error fetching teams with legacy schema:', legacyError);
+          throw new Error(`Failed to fetch teams: ${legacyError.message}`);
+        }
+
+        // Convert legacy format to new format
+        teams = legacyTeams?.map((team, index) => ({
+          id: team.id,
+          team_number: index + 1, // Assign sequential numbers
+          team_name: team.name,
+          created_at: team.created_at
+        })) || [];
+      } else if (error) {
         console.error('Error fetching teams:', error);
         throw new Error(`Failed to fetch teams: ${error.message}`);
       }
@@ -400,13 +492,31 @@ export const api = {
     }
   },
 
-  addTeam: async (teamName: string): Promise<{ success: boolean; teamId: string }> => {
+  addTeam: async (teamNumber: number, teamName?: string): Promise<{ success: boolean; teamId: string }> => {
     try {
-      const { data: team, error } = await supabase
+      // Try new schema first
+      let { data: team, error } = await supabase
         .from('teams')
-        .insert({ name: teamName.trim() })
+        .insert({ 
+          team_number: teamNumber,
+          team_name: teamName?.trim() || null
+        })
         .select()
         .single();
+
+      // If new schema fails, try legacy schema
+      if (error && error.code === '42703') {
+        console.log('Using legacy team schema for adding team');
+        const teamDisplayName = teamName?.trim() || `Team ${teamNumber}`;
+        const result = await supabase
+          .from('teams')
+          .insert({ name: teamDisplayName })
+          .select()
+          .single();
+        
+        team = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('Error adding team:', error);
@@ -417,6 +527,46 @@ export const api = {
       return { success: true, teamId: team.id };
     } catch (error) {
       console.error('Error in addTeam:', error);
+      throw error;
+    }
+  },
+
+  updateTeam: async (teamId: string, teamNumber: number, teamName?: string): Promise<{ success: boolean }> => {
+    try {
+      // Try new schema first
+      let { error } = await supabase
+        .from('teams')
+        .update({ 
+          team_number: teamNumber,
+          team_name: teamName?.trim() || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', teamId);
+
+      // If new schema fails, try legacy schema
+      if (error && error.code === '42703') {
+        console.log('Using legacy team schema for updating team');
+        const teamDisplayName = teamName?.trim() || `Team ${teamNumber}`;
+        const result = await supabase
+          .from('teams')
+          .update({ 
+            name: teamDisplayName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', teamId);
+        
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Error updating team:', error);
+        throw new Error(`Failed to update team: ${error.message}`);
+      }
+
+      console.log(`Team updated successfully: ${teamId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateTeam:', error);
       throw error;
     }
   },
