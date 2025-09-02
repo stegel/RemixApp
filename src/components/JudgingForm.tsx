@@ -1,271 +1,128 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-
-import { Textarea } from "./ui/textarea";
-import { Badge } from "./ui/badge";
-import { Separator } from "./ui/separator";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { toast } from "sonner@2.0.3";
-import { api, JudgingSubmission, AI_TOOLS_CATEGORIES, AI_TOOLS_SCALE_LABELS, EVALUATION_SCALE_LABELS, EVALUATION_SCALE_VALUES } from "../utils/api";
-import { getTeamDisplayName } from "../utils/teamUtils";
-
-interface AIToolsScores {
-  synthesizingResearch: number;
-  reviewingTranscripts: number;
-  serviceBlueprintJourneyMap: number;
-  summarizeProductDocs: number;
-  generateDesignConcepts: number;
-  generateMessagingUI: number;
-  updatingUICopy: number;
-  generateResearchPlan: number;
-  draftingProductDocs: number;
-  generateMultimediaContent: number;
-  createReleasePosts: number;
-}
-
-interface JudgingCriteria {
-  aiToolsScores: AIToolsScores;
-  solutionDescription: number; // 0=Did not demonstrate, 1=Basic, 2=Thoughtful, 3=Extraordinary
-  exRolesContribution: number; // 0=Did not demonstrate, 1=Basic, 2=Thoughtful, 3=Extraordinary
-  learnedNewTechnique: boolean;
-}
+import React, { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { questions, scaleOptions } from './constants';
+import { submitEvaluation, FormData, fetchTeams, Team, getTeamDisplayName } from '../utils/api';
+import { typographyStyles } from '../utils/ui-helpers';
 
 export function JudgingForm() {
-  const [teamName, setTeamName] = useState("");
-  const [judgeName, setJudgeName] = useState("");
-  const [teams, setTeams] = useState<{ id: string; team_number: number; team_name?: string }[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(true);
-  const [scores, setScores] = useState<JudgingCriteria>({
-    aiToolsScores: {
-      synthesizingResearch: 0,
-      reviewingTranscripts: 0,
-      serviceBlueprintJourneyMap: 0,
-      summarizeProductDocs: 0,
-      generateDesignConcepts: 0,
-      generateMessagingUI: 0,
-      updatingUICopy: 0,
-      generateResearchPlan: 0,
-      draftingProductDocs: 0,
-      generateMultimediaContent: 0,
-      createReleasePosts: 0,
-    },
-    solutionDescription: EVALUATION_SCALE_VALUES.didNotDemonstrate,
-    exRolesContribution: EVALUATION_SCALE_VALUES.didNotDemonstrate,
-    learnedNewTechnique: false,
+  const [formData, setFormData] = useState<FormData>({
+    participantName: '',
+    teamName: '',
+    question1: '',
+    question2: '',
+    question3: '',
+    question4: '',
+    question5: ''
   });
-  const [comments, setComments] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [teamsLoading, setTeamsLoading] = useState(true);
+
+  const loadTeams = async () => {
+    try {
+      const data = await fetchTeams(true); // Only load active teams
+      setTeams(data);
+    } catch (err) {
+      console.error('Failed to load teams:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load teams';
+      if (errorMessage.includes('Could not find the table')) {
+        setError('Database not set up yet. Please contact your administrator to run the database setup.');
+      } else {
+        setError('Failed to load teams. Please refresh the page.');
+      }
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTeams = async () => {
-      try {
-        const result = await api.getTeams();
-        setTeams(result.teams);
-      } catch (error) {
-        console.error('Error fetching teams:', error);
-        toast.error('Failed to load teams. Please refresh the page.');
-      } finally {
-        setLoadingTeams(false);
-      }
-    };
-
-    fetchTeams();
+    loadTeams();
   }, []);
 
-  const updateAIToolScore = (tool: keyof AIToolsScores, value: number[]) => {
-    setScores(prev => ({
+  const handleValueChange = (questionId: string, value: string) => {
+    setFormData(prev => ({
       ...prev,
-      aiToolsScores: {
-        ...prev.aiToolsScores,
-        [tool]: value[0]
-      }
+      [questionId]: value
     }));
   };
 
-  const updateLearnedNewTechnique = (value: string) => {
-    setScores(prev => ({
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
       ...prev,
-      learnedNewTechnique: value === 'yes'
+      [field]: value
     }));
-  };
-
-  const updateSolutionDescription = (value: string) => {
-    setScores(prev => ({
-      ...prev,
-      solutionDescription: EVALUATION_SCALE_VALUES[value as keyof typeof EVALUATION_SCALE_VALUES]
-    }));
-  };
-
-  const updateExRolesContribution = (value: string) => {
-    setScores(prev => ({
-      ...prev,
-      exRolesContribution: EVALUATION_SCALE_VALUES[value as keyof typeof EVALUATION_SCALE_VALUES]
-    }));
-  };
-
-  const getEvaluationLabel = (value: number) => {
-    const labelMap = {
-      [EVALUATION_SCALE_VALUES.didNotDemonstrate]: 'Did not demonstrate',
-      [EVALUATION_SCALE_VALUES.basic]: 'Basic',
-      [EVALUATION_SCALE_VALUES.thoughtful]: 'Thoughtful',
-      [EVALUATION_SCALE_VALUES.extraordinary]: 'Extraordinary'
-    };
-    return labelMap[value] || 'Did not demonstrate';
-  };
-
-  const getEvaluationKey = (value: number) => {
-    const keyMap = {
-      [EVALUATION_SCALE_VALUES.didNotDemonstrate]: 'didNotDemonstrate',
-      [EVALUATION_SCALE_VALUES.basic]: 'basic',
-      [EVALUATION_SCALE_VALUES.thoughtful]: 'thoughtful',
-      [EVALUATION_SCALE_VALUES.extraordinary]: 'extraordinary'
-    };
-    return keyMap[value] || 'didNotDemonstrate';
-  };
-
-  const calculateAIToolsTotal = () => {
-    return Object.values(scores.aiToolsScores).reduce((sum, score) => sum + score, 0);
-  };
-
-  const calculateAIToolsAverage = () => {
-    const total = calculateAIToolsTotal();
-    return (total / Object.keys(scores.aiToolsScores).length).toFixed(1);
-  };
-
-  const calculateTotalScore = () => {
-    return calculateAIToolsTotal() + scores.solutionDescription + scores.exRolesContribution;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
-    if (!teamName.trim() || !judgeName.trim()) {
-      toast.error("Please fill in all required fields");
+    const allFieldsFilled = Object.values(formData).every(value => value !== '');
+    
+    if (!allFieldsFilled) {
+      setError('Please fill in all fields before submitting.');
       return;
     }
-
+    
     setIsSubmitting(true);
-
+    
     try {
-      const submission: JudgingSubmission = {
-        teamName: teamName.trim(),
-        judgeName: judgeName.trim(),
-        scores,
-        comments: comments.trim(),
-      };
-
-      const result = await api.submitEvaluation(submission);
-      
-      if (result.success) {
-        setIsSubmitted(true);
-        toast.success("Evaluation submitted successfully!");
-        console.log("Evaluation submitted with ID:", result.evaluationId);
-      } else {
-        throw new Error("Failed to submit evaluation");
-      }
+      const result = await submitEvaluation(formData);
+      console.log('Evaluation submitted successfully:', result);
+      setSubmitted(true);
     } catch (error) {
-      console.error("Error submitting evaluation:", error);
-      toast.error("Failed to submit evaluation. Please try again.");
+      console.error('Error submitting evaluation:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while submitting your evaluation. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setTeamName("");
-    setJudgeName("");
-    setScores({
-      aiToolsScores: {
-        synthesizingResearch: 0,
-        reviewingTranscripts: 0,
-        serviceBlueprintJourneyMap: 0,
-        summarizeProductDocs: 0,
-        generateDesignConcepts: 0,
-        generateMessagingUI: 0,
-        updatingUICopy: 0,
-        generateResearchPlan: 0,
-        draftingProductDocs: 0,
-        generateMultimediaContent: 0,
-        createReleasePosts: 0,
-      },
-      solutionDescription: EVALUATION_SCALE_VALUES.didNotDemonstrate,
-      exRolesContribution: EVALUATION_SCALE_VALUES.didNotDemonstrate,
-      learnedNewTechnique: false,
+  const handleReset = () => {
+    setFormData({
+      participantName: '',
+      teamName: '',
+      question1: '',
+      question2: '',
+      question3: '',
+      question4: '',
+      question5: ''
     });
-    setComments("");
-    setIsSubmitted(false);
+    setSubmitted(false);
+    setError(null);
   };
 
-  if (isSubmitted) {
+  if (submitted) {
     return (
-      <Card className="w-full max-w-4xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle className="text-green-600">Evaluation Submitted!</CardTitle>
-          <CardDescription>
-            Your evaluation for team "{teamName}" has been successfully submitted and saved.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="bg-muted p-6 rounded-lg">
-            <h3 className="mb-4">Submitted Scores:</h3>
-            
-            {/* AI Tools Scores */}
-            <div className="mb-6">
-              <h4 className="mb-3">AI Tools Usage</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {AI_TOOLS_CATEGORIES.map((category) => (
-                  <div key={category.key} className="flex justify-between items-center">
-                    <span className="text-sm">{category.label}</span>
-                    <Badge variant="secondary">{scores.aiToolsScores[category.key]}/3</Badge>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex justify-between">
-                  <span>AI Tools Total:</span>
-                  <span>{calculateAIToolsTotal()}/33</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>AI Tools Average:</span>
-                  <span>{calculateAIToolsAverage()}/3</span>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Other Evaluation Criteria */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Solution Description</p>
-                <p className="text-2xl">{getEvaluationLabel(scores.solutionDescription)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">EX Roles Contribution</p>
-                <p className="text-2xl">{getEvaluationLabel(scores.exRolesContribution)}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Learning */}
-            <div className="text-center mt-6">
-              <p className="text-sm text-muted-foreground">Learned New Technique</p>
-              <p className="text-2xl">{scores.learnedNewTechnique ? 'Yes' : 'No'}</p>
-            </div>
-            
-            <div className="text-center mt-6 pt-4 border-t">
-              <p className="text-sm text-muted-foreground">Total Score</p>
-              <p className="text-3xl">{calculateTotalScore()}</p>
-            </div>
+      <Card className="w-full max-w-4xl mx-auto" style={{ borderRadius: 'var(--radius-card)' }}>
+        <CardContent className="p-8 text-center">
+          <div className="mb-6">
+            <h2 style={{ 
+              ...typographyStyles.h1,
+              color: 'var(--primary)'
+            }}>
+              Thank You!
+            </h2>
+            <p style={{ 
+              ...typographyStyles.muted,
+              marginTop: '16px'
+            }}>
+              Your feedback has been submitted successfully. We appreciate your participation in evaluating the AI experience simulation.
+            </p>
           </div>
-          <Button onClick={resetForm} className="w-full">
-            Judge Another Team
+          <Button 
+            onClick={handleReset}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            style={{ borderRadius: 'var(--radius-button)' }}
+          >
+            Submit Another Response
           </Button>
         </CardContent>
       </Card>
@@ -273,224 +130,155 @@ export function JudgingForm() {
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle>Team Presentation Evaluation</CardTitle>
-        <CardDescription>
-          Please evaluate the team's presentation based on the criteria below.
+    <Card className="w-full max-w-4xl mx-auto" style={{ borderRadius: 'var(--radius-card)' }}>
+      <CardHeader className="pb-6">
+        <CardTitle style={typographyStyles.h2}>
+          Experience Evaluation
+        </CardTitle>
+        <CardDescription style={typographyStyles.muted}>
+          Please rate your experience with the AI simulation on a scale from Strongly Disagree (0) to Strongly Agree (4).
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Team and Judge Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="team-name">Team Being Judged *</Label>
-              {loadingTeams ? (
-                <div className="h-10 bg-muted animate-pulse rounded-md"></div>
-              ) : teams.length > 0 ? (
-                <Select value={teamName} onValueChange={setTeamName} disabled={isSubmitting}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a team to judge" />
+          {/* Participant Information Section */}
+          <div className="space-y-6 pb-6 border-b border-border">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label 
+                  htmlFor="participantName"
+                  style={{ 
+                    ...typographyStyles.label,
+                    color: 'var(--foreground)'
+                  }}
+                >
+                  Your Name
+                </Label>
+                <Input
+                  id="participantName"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={formData.participantName}
+                  onChange={(e) => handleInputChange('participantName', e.target.value)}
+                  className="bg-input-background border-border"
+                  style={{ 
+                    borderRadius: 'var(--radius)',
+                    ...typographyStyles.body
+                  }}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label 
+                  htmlFor="teamName"
+                  style={{ 
+                    ...typographyStyles.label,
+                    color: 'var(--foreground)'
+                  }}
+                >
+                  Team Name
+                </Label>
+                <Select 
+                  value={formData.teamName} 
+                  onValueChange={(value) => handleInputChange('teamName', value)}
+                  disabled={teamsLoading || teams.length === 0}
+                >
+                  <SelectTrigger 
+                    className="bg-input-background border-border"
+                    style={{ 
+                      borderRadius: 'var(--radius)',
+                      ...typographyStyles.body
+                    }}
+                  >
+                    <SelectValue placeholder={
+                      teamsLoading ? "Loading teams..." : 
+                      teams.length === 0 ? "No teams available" : 
+                      "Select team to evaluate"
+                    } />
                   </SelectTrigger>
-                  <SelectContent>
-                    {teams.map((team) => {
-                      const displayName = getTeamDisplayName(team.team_number, team.team_name);
-                      return (
-                        <SelectItem key={team.id} value={displayName}>
-                          {displayName}
+                  <SelectContent style={{ borderRadius: 'var(--radius)' }}>
+                    {teams.length === 0 ? (
+                      <SelectItem value="__no_teams__" disabled style={typographyStyles.muted}>
+                        No teams available
+                      </SelectItem>
+                    ) : (
+                      teams.map((team) => (
+                        <SelectItem 
+                          key={team.id} 
+                          value={getTeamDisplayName(team)}
+                          style={typographyStyles.body}
+                        >
+                          {getTeamDisplayName(team)}
                         </SelectItem>
-                      );
-                    })}
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
-              ) : (
-                <div className="text-sm text-muted-foreground p-3 border rounded-md bg-muted">
-                  No teams available. Please ask an admin to add teams first.
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="judge-name">Your Name *</Label>
-              <Input
-                id="judge-name"
-                value={judgeName}
-                onChange={(e) => setJudgeName(e.target.value)}
-                placeholder="Enter your name"
-                required
-                disabled={isSubmitting}
-              />
+              </div>
             </div>
           </div>
 
-          {/* AI Tools Usage Section */}
-          <div className="space-y-6">
-            <div>
-              <h3>AI Tools Usage</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Rate each AI tool usage category on a scale from 0 (Did not use) to 3 (Exemplary usage).
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {AI_TOOLS_CATEGORIES.map((category, index) => (
-                <div key={category.key} className="space-y-3 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">
-                      {index + 1}. {category.label}
+          {/* Evaluation Questions Section */}
+          {questions.map((question, index) => (
+            <div key={question.id} className="space-y-4">
+              <div>
+                <h4 style={{ 
+                  ...typographyStyles.h4,
+                  marginBottom: '12px'
+                }}>
+                  {index + 1}. {question.text}
+                </h4>
+              </div>
+              
+              <RadioGroup
+                value={formData[question.id as keyof FormData]}
+                onValueChange={(value) => handleValueChange(question.id, value)}
+                className="grid grid-cols-1 md:grid-cols-5 gap-4"
+              >
+                {scaleOptions.map((option) => (
+                  <div key={option.value} className="relative">
+                    <RadioGroupItem 
+                      value={option.value} 
+                      id={`${question.id}-${option.value}`}
+                      className="absolute opacity-0 w-full h-full cursor-pointer"
+                    />
+                    <Label 
+                      htmlFor={`${question.id}-${option.value}`} 
+                      className="flex items-center justify-center cursor-pointer p-3 rounded-md border border-border hover:bg-accent/10 transition-colors text-center w-full min-h-[48px]"
+                      style={{ 
+                        ...typographyStyles.label,
+                        backgroundColor: formData[question.id as keyof FormData] === option.value ? 'var(--primary)' : 'transparent',
+                        color: formData[question.id as keyof FormData] === option.value ? 'var(--primary-foreground)' : 'var(--foreground)',
+                        borderColor: formData[question.id as keyof FormData] === option.value ? 'var(--primary)' : 'var(--border)'
+                      }}
+                    >
+                      {option.label}
                     </Label>
-                    <Badge variant="secondary">
-                      {scores.aiToolsScores[category.key]}/3
-                    </Badge>
                   </div>
-                  <RadioGroup
-                    value={scores.aiToolsScores[category.key].toString()}
-                    onValueChange={(value) => updateAIToolScore(category.key, [parseInt(value)])}
-                    disabled={isSubmitting}
-                    className="flex flex-col space-y-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="0" id={`${category.key}-0`} />
-                      <Label htmlFor={`${category.key}-0`} className="text-sm">Did not use (0)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="1" id={`${category.key}-1`} />
-                      <Label htmlFor={`${category.key}-1`} className="text-sm">Basic usage (1)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="2" id={`${category.key}-2`} />
-                      <Label htmlFor={`${category.key}-2`} className="text-sm">Good usage (2)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="3" id={`${category.key}-3`} />
-                      <Label htmlFor={`${category.key}-3`} className="text-sm">Exemplary usage (3)</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              ))}
-            </div>
-
-
-          </div>
-
-          <Separator />
-
-          {/* Other Evaluation Criteria */}
-          <div className="space-y-6">
-            <h3>Other Evaluation Criteria</h3>
-            
-            {/* Solution Description */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Solution description and AI contribution</Label>
-                <Badge variant="secondary">{getEvaluationLabel(scores.solutionDescription)}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                The team's presentation clearly described their proposed solution and how AI contributed to the outcome.
-              </p>
-              <RadioGroup
-                value={getEvaluationKey(scores.solutionDescription)}
-                onValueChange={updateSolutionDescription}
-                disabled={isSubmitting}
-                className="flex flex-col space-y-3"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="didNotDemonstrate" id="solution-didNotDemonstrate" />
-                  <Label htmlFor="solution-didNotDemonstrate">Did not demonstrate - No clear solution or AI contribution described</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="basic" id="solution-basic" />
-                  <Label htmlFor="solution-basic">Basic - Limited clarity on solution and AI contribution</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="thoughtful" id="solution-thoughtful" />
-                  <Label htmlFor="solution-thoughtful">Thoughtful - Clear description of solution and AI role</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="extraordinary" id="solution-extraordinary" />
-                  <Label htmlFor="solution-extraordinary">Extraordinary - Exceptional clarity on solution and AI impact</Label>
-                </div>
+                ))}
               </RadioGroup>
             </div>
-
-            {/* EX Roles Contribution */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Demonstrates how EX roles contribute to better outcomes</Label>
-                <Badge variant="secondary">{getEvaluationLabel(scores.exRolesContribution)}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                How well does the team demonstrate how experience roles (content, research, design) contribute to better outcomes?
+          ))}
+          
+          {error && (
+            <div className="p-4 rounded-md border border-destructive bg-destructive/10 text-destructive" style={{ borderRadius: 'var(--radius)' }}>
+              <p style={typographyStyles.body}>
+                {error}
               </p>
-              <RadioGroup
-                value={getEvaluationKey(scores.exRolesContribution)}
-                onValueChange={updateExRolesContribution}
-                disabled={isSubmitting}
-                className="flex flex-col space-y-3"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="didNotDemonstrate" id="ex-didNotDemonstrate" />
-                  <Label htmlFor="ex-didNotDemonstrate">Did not demonstrate - No clear demonstration of EX role value</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="basic" id="ex-basic" />
-                  <Label htmlFor="ex-basic">Basic - Limited demonstration of EX role value</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="thoughtful" id="ex-thoughtful" />
-                  <Label htmlFor="ex-thoughtful">Thoughtful - Clear demonstration of how EX roles add value</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="extraordinary" id="ex-extraordinary" />
-                  <Label htmlFor="ex-extraordinary">Extraordinary - Exceptional demonstration of EX role impact</Label>
-                </div>
-              </RadioGroup>
             </div>
-
-            <Separator />
-
-            {/* Learning Question */}
-            <div className="space-y-3">
-              <Label>I learned a new technique from the team's presentation</Label>
-              <p className="text-sm text-muted-foreground">
-                Did you learn something new from watching this team's presentation?
-              </p>
-              <RadioGroup
-                value={scores.learnedNewTechnique ? 'yes' : 'no'}
-                onValueChange={updateLearnedNewTechnique}
-                disabled={isSubmitting}
-                className="flex space-x-6"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="yes" id="learned-yes" />
-                  <Label htmlFor="learned-yes">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="no" id="learned-no" />
-                  <Label htmlFor="learned-no">No</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-
-          {/* Comments */}
-          <div className="space-y-2">
-            <Label htmlFor="comments">Additional Comments (Optional)</Label>
-            <Textarea
-              id="comments"
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              placeholder="Provide any additional feedback or comments..."
-              rows={3}
+          )}
+          
+          <div className="pt-6 border-t border-border">
+            <Button 
+              type="submit" 
               disabled={isSubmitting}
-            />
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ borderRadius: 'var(--radius-button)' }}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
+            </Button>
           </div>
-
-
-
-          <Button type="submit" className="w-full" disabled={isSubmitting || teams.length === 0}>
-            {isSubmitting ? "Submitting..." : "Submit Evaluation"}
-          </Button>
         </form>
       </CardContent>
     </Card>

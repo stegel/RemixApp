@@ -1,7 +1,7 @@
 
-  # Team Presentation Judging App
+  # Judging Form for AI Simulation
 
-  This is a code bundle for Team Presentation Judging App. The original project is available at https://www.figma.com/design/FX9eDIlCzahI0oitf1Uk0M/Team-Presentation-Judging-App.
+  This is a code bundle for Judging Form for AI Simulation. The original project is available at https://www.figma.com/design/EtV4azI47jN0G92oVOAWxp/Judging-Form-for-AI-Simulation.
 
   ## Running the code
 

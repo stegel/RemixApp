@@ -1,228 +1,165 @@
-import { useState } from "react";
-import { JudgingForm } from "./components/JudgingForm";
-import { ResultsDashboard } from "./components/ResultsDashboard";
-import { AdminPage } from "./components/AdminPage";
-import { AdminLogin } from "./components/AdminLogin";
-import { Toaster } from "./components/ui/sonner";
-import { Button } from "./components/ui/button";
-import { Card, CardContent } from "./components/ui/card";
-import {
-  BarChart3,
-  ClipboardList,
-  Home,
-  Settings,
-  LogOut,
-} from "lucide-react";
-import navLogo from "figma:asset/27c0a819fb0f073a52b84d71b730ef7164a6f413.png";
-import bannerLogo from "figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png";
+import React, { useState, useEffect } from 'react';
+import { JudgingForm } from './components/JudgingForm';
+import { AdminDashboard } from './components/AdminDashboard';
+import { DatabaseSetup } from './components/DatabaseSetup';
+import { Button } from './components/ui/button';
+import { checkDatabaseStatus, DatabaseStatus, refreshSchemaCache } from './utils/database-status';
+import { RefreshCw } from 'lucide-react';
+import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<
-    "home" | "judge" | "results" | "admin" | "admin-login"
-  >("home");
-  const [isAdminAuthenticated, setIsAdminAuthenticated] =
-    useState(false);
+  const [activeView, setActiveView] = useState<'form' | 'admin'>('form');
+  const [dbStatus, setDbStatus] = useState<DatabaseStatus>({ isConnected: false, tablesExist: false });
+  const [dbStatusLoading, setDbStatusLoading] = useState(true);
 
-  const handleAdminAccess = () => {
-    if (isAdminAuthenticated) {
-      setCurrentView("admin");
-    } else {
-      setCurrentView("admin-login");
-    }
-  };
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const status = await checkDatabaseStatus();
+        setDbStatus(status);
+      } catch (error) {
+        setDbStatus({
+          isConnected: false,
+          tablesExist: false,
+          error: 'Failed to check database status'
+        });
+      } finally {
+        setDbStatusLoading(false);
+      }
+    };
 
-  const handleAdminLogin = () => {
-    setIsAdminAuthenticated(true);
-    setCurrentView("admin");
-  };
-
-  const handleAdminLogout = () => {
-    setIsAdminAuthenticated(false);
-    setCurrentView("home");
-  };
-
-  const renderView = () => {
-    switch (currentView) {
-      case "judge":
-        return <JudgingForm />;
-      case "results":
-        return <ResultsDashboard />;
-      case "admin":
-        return isAdminAuthenticated ? (
-          <AdminPage />
-        ) : (
-          <AdminLogin
-            onLogin={handleAdminLogin}
-            onCancel={() => setCurrentView("home")}
-          />
-        );
-      case "admin-login":
-        return (
-          <AdminLogin
-            onLogin={handleAdminLogin}
-            onCancel={() => setCurrentView("home")}
-          />
-        );
-      default:
-        return (
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Banner Logo */}
-            <div className="text-center mb-8">
-              <img
-                src={bannerLogo}
-                alt="ServiceNow ReMix"
-                className="mx-auto mb-6 h-20 w-auto"
-              />
-            </div>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center mb-8">
-                  <h2 className="mb-2">
-                    AI in The Mix: Experience Simulation
-                  </h2>
-                  <h3 className="mb-4">Team evaluations</h3>
-                  <p className="text-muted-foreground">
-                    Please complete the evaluation form for each
-                    team presentation you watch. Each member of
-                    your team should complete their own
-                    evaluation of each team.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Button
-                    variant="outline"
-                    className="h-32 flex-col space-y-2"
-                    onClick={() => setCurrentView("judge")}
-                  >
-                    <ClipboardList className="w-8 h-8" />
-                    <div className="text-center">
-                      <div>Submit Evaluation</div>
-                      <div className="text-sm text-muted-foreground">
-                        Judge a team's presentation
-                      </div>
-                    </div>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="h-32 flex-col space-y-2"
-                    onClick={() => setCurrentView("results")}
-                  >
-                    <BarChart3 className="w-8 h-8" />
-                    <div className="text-center">
-                      <div>View Results</div>
-                      <div className="text-sm text-muted-foreground">
-                        See team rankings and scores
-                      </div>
-                    </div>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-    }
-  };
+    checkStatus();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Navigation */}
-      <nav className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <img
-                src={navLogo}
-                alt="ServiceNow"
-                className="h-8 w-8"
-              />
-              <div className="hidden md:flex flex-col">
-                <span className="text-lg">ReMix 2025</span>
-                <span className="text-sm text-muted-foreground">
-                  AI in the Mix: Experience Simulation
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="w-full py-8 px-4 border-b border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col items-center space-y-4 mb-6">
+            <img 
+              src={logoImage} 
+              alt="ServiceNow ReMix Logo" 
+              className="h-16 w-auto"
+            />
+            <div className="text-center">
+              <h1 style={{ 
+                fontFamily: 'var(--font-family-cabin)', 
+                fontSize: 'var(--text-h1)', 
+                fontWeight: 'var(--font-weight-bold)',
+                color: 'var(--foreground)',
+                marginBottom: '8px'
+              }}>
+                AI in The Mix: Experience Simulation
+              </h1>
+              <p style={{ 
+                fontFamily: 'var(--font-family-lato)', 
+                fontSize: 'var(--text-base)', 
+                fontWeight: 'var(--font-weight-regular)',
+                color: 'var(--muted-foreground)'
+              }}>
+                Make sure at least 3 of your team mates judge each presentation you see
+              </p>
+              <div className="mt-2 flex items-center justify-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  dbStatusLoading ? 'bg-muted-foreground' : 
+                  dbStatus.tablesExist ? 'bg-accent' : 
+                  dbStatus.isConnected ? 'bg-primary' : 'bg-destructive'
+                }`}></div>
+                <span style={{ 
+                  fontFamily: 'var(--font-family-lato)', 
+                  fontSize: 'var(--text-label)', 
+                  fontWeight: 'var(--font-weight-regular)',
+                  color: dbStatusLoading ? 'var(--muted-foreground)' :
+                         dbStatus.tablesExist ? 'var(--accent)' : 
+                         dbStatus.isConnected ? 'var(--primary)' : 'var(--destructive)'
+                }}>
+                  {dbStatusLoading ? 'Checking database...' :
+                   dbStatus.tablesExist ? 'Database Ready' :
+                   dbStatus.isConnected ? 'Database Setup Required' : 'Database Connection Error'}
                 </span>
+                {dbStatus.isConnected && !dbStatusLoading && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      setDbStatusLoading(true);
+                      try {
+                        await refreshSchemaCache();
+                        setTimeout(async () => {
+                          const status = await checkDatabaseStatus();
+                          setDbStatus(status);
+                          setDbStatusLoading(false);
+                        }, 2000);
+                      } catch (error) {
+                        setDbStatusLoading(false);
+                      }
+                    }}
+                    className="h-6 px-2 text-xs"
+                    style={{ borderRadius: 'var(--radius-button)' }}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </Button>
+                )}
               </div>
             </div>
-
-            <div className="flex items-center space-x-2">
+          </div>
+          
+          {/* Navigation */}
+          {dbStatus.tablesExist && (
+            <div className="flex justify-center space-x-4">
               <Button
-                variant={
-                  currentView === "home" ? "default" : "ghost"
-                }
-                size="sm"
-                onClick={() => setCurrentView("home")}
+                onClick={() => setActiveView('form')}
+                variant={activeView === 'form' ? 'default' : 'outline'}
+                className={activeView === 'form' ? 'bg-primary text-primary-foreground' : ''}
+                style={{ borderRadius: 'var(--radius-button)' }}
               >
-                <Home className="w-4 h-4 mr-2" />
-                Home
+                Submit Evaluation
               </Button>
               <Button
-                variant={
-                  currentView === "judge" ? "default" : "ghost"
-                }
-                size="sm"
-                onClick={() => setCurrentView("judge")}
+                onClick={() => setActiveView('admin')}
+                variant={activeView === 'admin' ? 'default' : 'outline'}
+                className={activeView === 'admin' ? 'bg-primary text-primary-foreground' : ''}
+                style={{ borderRadius: 'var(--radius-button)' }}
               >
-                <ClipboardList className="w-4 h-4 mr-2" />
-                Judge
-              </Button>
-              <Button
-                variant={
-                  currentView === "results"
-                    ? "default"
-                    : "ghost"
-                }
-                size="sm"
-                onClick={() => setCurrentView("results")}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Results
+                Admin Dashboard
               </Button>
             </div>
-          </div>
+          )}
         </div>
-      </nav>
+      </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 flex-1">
-        {renderView()}
+      <main className="py-12 px-4">
+        {!dbStatusLoading && !dbStatus.tablesExist ? (
+          <DatabaseSetup 
+            hasError={!!dbStatus.error} 
+            errorMessage={dbStatus.error}
+            onRefresh={async () => {
+              setDbStatusLoading(true);
+              const status = await checkDatabaseStatus();
+              setDbStatus(status);
+              setDbStatusLoading(false);
+            }}
+          />
+        ) : (
+          activeView === 'form' ? <JudgingForm /> : <AdminDashboard />
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-muted/30">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-muted-foreground">
-              © 2025 ServiceNow EXperience Organization
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleAdminAccess}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Administration
-              </Button>
-              {isAdminAuthenticated && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleAdminLogout}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Button>
-              )}
-            </div>
-          </div>
+      <footer className="w-full py-6 px-4 border-t border-border mt-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <p style={{ 
+            fontFamily: 'var(--font-family-lato)', 
+            fontSize: 'var(--text-label)', 
+            fontWeight: 'var(--font-weight-regular)',
+            color: 'var(--muted-foreground)'
+          }}>
+            Your responses help us create better AI experiences
+          </p>
         </div>
       </footer>
-
-      <Toaster />
     </div>
   );
 }

@@ -1,81 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Cabin:wght@700&family=Lato:wght@400;600;700&display=swap');
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-size: 14px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --font-size: 16px;
+  /* The default background color for the application. */
+  --background: rgba(255, 255, 255, 1.00);
+  /* The default color for elements or text that appears on top of the background. */
+  --foreground: rgba(16, 23, 26, 1.00);
+  /* The background color for cards, modals, and other containers. */
+  --card: rgba(255, 255, 255, 1.00);
+  /* The default color for text or elements that appear on top of cards, modals and other background containers. */
+  --card-foreground: rgba(16, 23, 26, 1.00);
+  /* The background color for dropdowns and tooltips. */
+  --popover: rgba(255, 255, 255, 1.00);
+  /* The default color for text or elements that appear on top of dropdowns and tooltips. */
+  --popover-foreground: rgba(16, 23, 26, 1.00);
+  /* The primary color used for buttons, links, and other interactive elements. */
+  --primary: rgba(0, 128, 163, 1.00);
+  /* The default color for text or elements that appear on top of primary colored elements. */
+  --primary-foreground: rgba(255, 255, 255, 1.00);
+  /* The secondary color used for secondary(but NOT-DESTRUCTIVE) buttons and interactive elements. */
+  --secondary: rgba(0, 0, 0, 0);
+  /* The default color for text or elements that appear on top of secondary colored elements. */
+  --secondary-foreground: rgba(0, 128, 163, 1.00);
+  /* The muted color used for less prominent elements, such as disabled buttons or disabled text. */
+  --muted: rgba(0, 0, 0, 0);
+  /* The default color for text or elements that appear on top of muted colored elements. */
+  --muted-foreground: rgba(55, 68, 74, 1.00);
+  /* The accent color used for highlights, links, and other interactive elements. */
+  --accent: rgba(98, 216, 78, 1.00);
+  /* The default color for text or elements that appear on top of accent colored elements. */
+  --accent-foreground: rgba(255, 255, 255, 1.00);
+  /* The color used for background in destructive actions, such as delete buttons or error messages. */
+  --destructive: rgba(229, 34, 57, 1.00);
+  /* The default color for text or elements that appear on top of destructive colored elements. */
+  --destructive-foreground: rgba(255, 255, 255, 1.00);
+  /* The default border color for elements such as inputs, buttons, and other containers. */
+  --border: rgba(115, 127, 132, 1.00);
+  /* The default background color for input fields once the text has been filled. Should be either transparent or match the input-background. */
+  --input: rgba(115, 127, 132, 1.00);
+  /* The default background color for input fields, text areas, and other input elements. */
+  --input-background: rgba(255, 255, 255, 1.00);
+  /* The color for focus rings, outlines, and other focus indicators. */
+  --ring: rgba(53, 147, 37, 1.00);
+  /* Shadow for small elevations, such as cards or modals. */
+  --elevation-sm: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  /* The color for chart elements, such as a bar or line in a chart. */
+  --chart-1: rgba(10, 184, 217, 1.00);
+  /* The color for another chart element, such as a bar or line in a chart. */
+  --chart-2: rgba(0, 153, 25, 1.00);
+  /* The color for another chart element, such as a bar or line in a chart. */
+  --chart-3: rgba(255, 87, 48, 1.00);
+  /* The color for another chart element, such as a bar or line in a chart. */
+  --chart-4: rgba(220, 24, 156, 1.00);
+  /* The color for another chart element, such as a bar or line in a chart. */
+  --chart-5: rgba(123, 86, 255, 1.00);
+  /* The default border radius for elements such as buttons, tooltip, and other containers. */
+  --radius: 6px;
+  /* Card container border radius. */
+  --radius-card: 4px;
+  /* Button border radius. */
+  --radius-button: 6px;
+  /* Badge border radius. */
+  --radius-badge: 12px;
+  /* The background color for sidebars, navigation menus, and other persistent elements. */
+  --sidebar: rgba(3, 45, 66, 1.00);
+  /* The default color for text or elements that appear on top of sidebars, navigation menus, and other persistent elements. */
+  --sidebar-foreground: rgba(255, 255, 255, 1.00);
+  /* The primary color used for buttons, links, and other interactive elements in sidebars and navigation menus. */
+  --sidebar-primary: rgba(0, 128, 163, 1.00);
+  /* The default color for text or elements that appear on top of primary colored elements in sidebars and navigation menus. */
+  --sidebar-primary-foreground: rgba(255, 255, 255, 1.00);
+  /* The accent color used for highlights, links, and other interactive elements in sidebars and navigation menus. */
+  --sidebar-accent: rgba(98, 216, 78, 1.00);
+  /* The default color for text or elements that appear on top of accent colored elements in sidebars and navigation menus. */
+  --sidebar-accent-foreground: rgba(255, 255, 255, 1.00);
+  /* The default border color for elements in sidebars and navigation menus. */
+  --sidebar-border: rgba(115, 127, 132, 1.00);
+  /* The default color for focus rings, outlines, and other focus indicators in sidebars and navigation menus. */
+  --sidebar-ring: rgba(53, 147, 37, 1.00);
+  
+  /* Typography variables */
+  --font-family-cabin: 'Cabin', sans-serif;
+  --font-family-lato: 'Lato', sans-serif;
+  --font-weight-bold: 700;
+  --font-weight-semibold: 600;
+  --font-weight-regular: 400;
+  --text-h1: 32px;
+  --text-h2: 20px;
+  --text-h3: 16px;
+  --text-h4: 16px;
+  --text-base: 16px;
+  --text-label: 12px;
 }
 
 @theme inline {
@@ -98,17 +115,19 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
-  --color-switch-background: var(--switch-background);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: var(--radius-badge);
+  --radius-card: var(--radius-card);
+  --radius-button: var(--radius-button);
+  --radius-badge: var(--radius-badge);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -129,68 +148,69 @@
   }
 }
 
-/**
- * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
- */
-@layer base {
-  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
-    h1 {
-      font-size: var(--text-2xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+h1 {
+  font-family: var(--font-family-cabin);
+  font-size: var(--text-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.5;
+}
 
-    h2 {
-      font-size: var(--text-xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+h2 {
+  font-family: var(--font-family-cabin);
+  font-size: var(--text-h2);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.5;
+}
 
-    h3 {
-      font-size: var(--text-lg);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+h3 {
+  font-family: var(--font-family-cabin);
+  font-size: var(--text-h3);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.5;
+}
 
-    h4 {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+h4 {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-h4);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.5;
+}
 
-    p {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
+p {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+}
 
-    label {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+span {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+}
 
-    button {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+label {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+}
 
-    input {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
-  }
+button {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.5;
+}
+
+input {
+  font-family: var(--font-family-lato);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
 }
 
 html {
   font-size: var(--font-size);
-}
-
-/* Mobile font size optimization */
-@media (max-width: 768px) {
-  html {
-    font-size: 16px;
-  }
 }
