@@ -369,14 +369,14 @@ app.delete('/make-server-990f6b7c/teams/:id', async (c) => {
   try {
     const id = c.req.param('id');
 
-    // Check if team has evaluations
+    // Check if team has evaluations using team_id foreign key
     const { data: evaluations, error: evalError } = await supabase
       .from('evaluations')
       .select('id')
-      .eq('team_name', (await supabase.from('teams').select('name').eq('id', id).single()).data?.name)
+      .eq('team_id', id)
       .limit(1);
 
-    if (evalError && evalError.code !== 'PGRST116') {
+    if (evalError) {
       console.error('Error checking evaluations:', evalError);
       return c.json({ error: 'Failed to check team evaluations' }, 500);
     }
@@ -408,11 +408,16 @@ app.delete('/make-server-990f6b7c/teams/:id', async (c) => {
 app.post('/make-server-990f6b7c/evaluations', async (c) => {
   try {
     const body = await c.req.json();
-    const { participantName, teamName, question1, question2, question3, question4, question5 } = body;
+    const { participantName, teamId, question1, question2, question3, question4, question5 } = body;
 
     // Validate required fields
-    if (!participantName || !teamName || !question1 || !question2 || !question3 || !question4 || !question5) {
+    if (!participantName || !teamId || !question1 || !question2 || !question3 || !question4 || !question5) {
       return c.json({ error: 'All fields are required' }, 400);
+    }
+
+    // Validate teamId is a positive integer
+    if (!Number.isInteger(teamId) || teamId <= 0) {
+      return c.json({ error: 'Valid team ID is required' }, 400);
     }
 
     // Validate score ranges (0-4 scale)
@@ -426,11 +431,22 @@ app.post('/make-server-990f6b7c/evaluations', async (c) => {
       return c.json({ error: 'All scores must be between 0 and 4 (0=Strongly Disagree, 4=Strongly Agree)' }, 400);
     }
 
+    // Verify team exists
+    const { data: teamData, error: teamError } = await supabase
+      .from('teams')
+      .select('id, name, team_number')
+      .eq('id', teamId)
+      .single();
+
+    if (teamError || !teamData) {
+      return c.json({ error: 'Invalid team ID - team not found' }, 400);
+    }
+
     const { data, error } = await supabase
       .from('evaluations')
       .insert({
         participant_name: participantName,
-        team_name: teamName,
+        team_id: teamId,
         curiosity_score: parseInt(question1),
         experimentation_score: parseInt(question2),
         learning_score: parseInt(question3),
@@ -456,16 +472,18 @@ app.post('/make-server-990f6b7c/evaluations', async (c) => {
 // READ - Get all evaluations (with optional filtering)
 app.get('/make-server-990f6b7c/evaluations', async (c) => {
   try {
-    const teamName = c.req.query('team');
+    const teamId = c.req.query('teamId');
     const participantName = c.req.query('participant');
 
+    // Use the evaluations_with_team_names view for consistent team name display
     let query = supabase
-      .from('evaluations')
+      .from('evaluations_with_team_names')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (teamName) {
-      query = query.eq('team_name', teamName);
+    // Filter by team ID
+    if (teamId) {
+      query = query.eq('team_id', teamId);
     }
     
     if (participantName) {
@@ -475,8 +493,45 @@ app.get('/make-server-990f6b7c/evaluations', async (c) => {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Database fetch error:', error);
-      return c.json({ error: 'Failed to fetch evaluations' }, 500);
+      console.error('Database fetch error with view:', error);
+      
+      // Fallback to direct join query if view doesn't exist
+      let fallbackQuery = supabase
+        .from('evaluations')
+        .select(`
+          *,
+          teams:team_id (
+            id,
+            name,
+            team_number,
+            location
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (teamId) {
+        fallbackQuery = fallbackQuery.eq('team_id', teamId);
+      }
+      
+      if (participantName) {
+        fallbackQuery = fallbackQuery.ilike('participant_name', `%${participantName}%`);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+      if (fallbackError) {
+        console.error('Fallback query error:', fallbackError);
+        return c.json({ error: 'Failed to fetch evaluations' }, 500);
+      }
+
+      // Transform the joined data to match expected format
+      const transformedData = fallbackData.map(evaluation => ({
+        ...evaluation,
+        team_name: evaluation.teams?.name || `Team ${evaluation.teams?.team_number}` || `Team #${evaluation.team_id}`,
+        team_location: evaluation.teams?.location
+      }));
+
+      return c.json({ success: true, data: transformedData });
     }
 
     return c.json({ success: true, data });
@@ -517,11 +572,16 @@ app.put('/make-server-990f6b7c/evaluations/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const { participantName, teamName, question1, question2, question3, question4, question5 } = body;
+    const { participantName, teamId, question1, question2, question3, question4, question5 } = body;
 
     // Validate required fields
-    if (!participantName || !teamName || !question1 || !question2 || !question3 || !question4 || !question5) {
+    if (!participantName || !teamId || !question1 || !question2 || !question3 || !question4 || !question5) {
       return c.json({ error: 'All fields are required' }, 400);
+    }
+
+    // Validate teamId is a positive integer
+    if (!Number.isInteger(teamId) || teamId <= 0) {
+      return c.json({ error: 'Valid team ID is required' }, 400);
     }
 
     // Validate score ranges (0-4 scale)
@@ -535,11 +595,22 @@ app.put('/make-server-990f6b7c/evaluations/:id', async (c) => {
       return c.json({ error: 'All scores must be between 0 and 4 (0=Strongly Disagree, 4=Strongly Agree)' }, 400);
     }
 
+    // Verify team exists
+    const { data: teamData, error: teamError } = await supabase
+      .from('teams')
+      .select('id, name, team_number')
+      .eq('id', teamId)
+      .single();
+
+    if (teamError || !teamData) {
+      return c.json({ error: 'Invalid team ID - team not found' }, 400);
+    }
+
     const { data, error } = await supabase
       .from('evaluations')
       .update({
         participant_name: participantName,
-        team_name: teamName,
+        team_id: teamId,
         curiosity_score: parseInt(question1),
         experimentation_score: parseInt(question2),
         learning_score: parseInt(question3),
@@ -591,39 +662,49 @@ app.delete('/make-server-990f6b7c/evaluations/:id', async (c) => {
 // GET - Analytics endpoint for team performance
 app.get('/make-server-990f6b7c/analytics/teams', async (c) => {
   try {
-    // First get evaluation data
+    // Use team_id based approach with proper joins
     const { data: evaluationData, error: evalError } = await supabase
       .from('evaluations')
-      .select('team_name, curiosity_score, experimentation_score, learning_score, innovation_score, collaboration_score');
+      .select(`
+        team_id,
+        curiosity_score,
+        experimentation_score,
+        learning_score,
+        innovation_score,
+        collaboration_score,
+        teams:team_id (
+          id,
+          name,
+          team_number,
+          location
+        )
+      `);
 
     if (evalError) {
       console.error('Analytics fetch error:', evalError);
       return c.json({ error: 'Failed to fetch analytics data' }, 500);
     }
 
-    // Get team information for location data
-    const { data: teamData, error: teamError } = await supabase
-      .from('teams')
-      .select('name, location');
-
-    if (teamError) {
-      console.error('Team fetch error:', teamError);
-      return c.json({ error: 'Failed to fetch team data' }, 500);
+    if (!evaluationData || evaluationData.length === 0) {
+      return c.json({ success: true, data: [] });
     }
 
-    // Create a map of team names to their details
-    const teamDetailsMap = teamData.reduce((acc: any, team: any) => {
-      acc[team.name] = { location: team.location };
-      return acc;
-    }, {});
-
-    // Calculate team averages
+    // Group evaluations by team and calculate statistics
     const teamStats = evaluationData.reduce((acc: any, evaluation: any) => {
-      const team = evaluation.team_name;
-      if (!acc[team]) {
-        acc[team] = {
-          teamName: team,
-          location: teamDetailsMap[team]?.location || null,
+      const teamInfo = evaluation.teams;
+      const teamId = evaluation.team_id;
+      
+      if (!teamInfo || !teamId) {
+        console.warn('Evaluation missing team information:', evaluation);
+        return acc;
+      }
+      
+      const teamName = teamInfo.name || `Team ${teamInfo.team_number}` || `Team #${teamId}`;
+      
+      if (!acc[teamId]) {
+        acc[teamId] = {
+          teamName: teamName,
+          location: teamInfo.location || null,
           count: 0,
           totalCuriosity: 0,
           totalExperimentation: 0,
@@ -633,17 +714,17 @@ app.get('/make-server-990f6b7c/analytics/teams', async (c) => {
         };
       }
       
-      acc[team].count += 1;
-      acc[team].totalCuriosity += evaluation.curiosity_score;
-      acc[team].totalExperimentation += evaluation.experimentation_score;
-      acc[team].totalLearning += evaluation.learning_score;
-      acc[team].totalInnovation += evaluation.innovation_score;
-      acc[team].totalCollaboration += evaluation.collaboration_score;
+      acc[teamId].count += 1;
+      acc[teamId].totalCuriosity += evaluation.curiosity_score || 0;
+      acc[teamId].totalExperimentation += evaluation.experimentation_score || 0;
+      acc[teamId].totalLearning += evaluation.learning_score || 0;
+      acc[teamId].totalInnovation += evaluation.innovation_score || 0;
+      acc[teamId].totalCollaboration += evaluation.collaboration_score || 0;
       
       return acc;
     }, {});
 
-    // Calculate averages
+    // Calculate averages and format response
     const analytics = Object.values(teamStats).map((team: any) => {
       const totalSum = team.totalCuriosity + team.totalExperimentation + team.totalLearning + team.totalInnovation + team.totalCollaboration;
       return {

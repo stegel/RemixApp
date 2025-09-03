@@ -170,15 +170,43 @@ export function TeamSummaryTable({
     }));
   };
 
-  const copyTeamNames = async (
-    level: string,
-    teams: TeamAnalytics[],
-  ) => {
+  // Robust copy function with fallbacks
+  const copyToClipboard = (text: string): boolean => {
+    try {
+      // Method 1: Try modern Clipboard API first (if available and secure context)
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text);
+        return true;
+      }
+
+      // Method 2: Fallback to legacy approach with invisible textarea
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      return successful;
+    } catch (err) {
+      console.error('All copy methods failed:', err);
+      return false;
+    }
+  };
+
+  const copyTeamNames = (level: string, teams: TeamAnalytics[]) => {
     const teamNames = teams
       .map((team) => team.teamName)
       .join("\n");
-    try {
-      await navigator.clipboard.writeText(teamNames);
+    
+    const success = copyToClipboard(teamNames);
+    
+    if (success) {
       setCopiedSections((prev) => ({ ...prev, [level]: true }));
       setTimeout(() => {
         setCopiedSections((prev) => ({
@@ -186,12 +214,13 @@ export function TeamSummaryTable({
           [level]: false,
         }));
       }, 2000);
-    } catch (err) {
-      console.error("Failed to copy team names:", err);
+    } else {
+      // Show error or alternative action
+      alert(`Could not copy automatically. Please manually copy these team names:\n\n${teamNames}`);
     }
   };
 
-  const copyAllTeamNames = async () => {
+  const copyAllTeamNames = () => {
     const allTeams = aiLevelOrder
       .filter(
         (level) =>
@@ -205,14 +234,16 @@ export function TeamSummaryTable({
       })
       .join("\n\n");
 
-    try {
-      await navigator.clipboard.writeText(allTeams);
+    const success = copyToClipboard(allTeams);
+    
+    if (success) {
       setCopiedSections((prev) => ({ ...prev, all: true }));
       setTimeout(() => {
         setCopiedSections((prev) => ({ ...prev, all: false }));
       }, 2000);
-    } catch (err) {
-      console.error("Failed to copy all team names:", err);
+    } else {
+      // Show error or alternative action
+      alert(`Could not copy automatically. Please manually copy these team names:\n\n${allTeams}`);
     }
   };
 
@@ -737,8 +768,7 @@ export function TeamSummaryTable({
                                           className="h-2 bg-muted rounded-full"
                                           style={{
                                             width: "60px",
-                                            borderRadius:
-                                              "var(--radius)",
+                                            borderRadius: "var(--radius)",
                                           }}
                                         >
                                           <div
@@ -748,23 +778,19 @@ export function TeamSummaryTable({
                                               backgroundColor:
                                                 totalScore >= 16
                                                   ? "var(--accent)"
-                                                  : totalScore >=
-                                                      12
+                                                  : totalScore >= 12
                                                     ? "var(--primary)"
-                                                    : totalScore >=
-                                                        8
+                                                    : totalScore >= 8
                                                       ? "var(--chart-3)"
                                                       : "var(--destructive)",
-                                              borderRadius:
-                                                "var(--radius)",
+                                              borderRadius: "var(--radius)",
                                             }}
                                           />
                                         </div>
                                         <span
                                           style={{
                                             ...typographyStyles.muted,
-                                            fontSize:
-                                              "var(--text-label)",
+                                            fontSize: "var(--text-label)",
                                           }}
                                         >
                                           {percentage}%

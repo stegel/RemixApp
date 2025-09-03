@@ -4,7 +4,7 @@ const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-
 
 export interface FormData {
   participantName: string;
-  teamName: string;
+  teamId: number; // Team ID reference (required)
   question1: string;
   question2: string;
   question3: string;
@@ -15,13 +15,16 @@ export interface FormData {
 export interface Evaluation {
   id: number;
   participant_name: string;
-  team_name: string;
+  team_id: number; // Team ID field (required)
+  team_name?: string; // Computed team name from join/function
+  team_location?: string; // Team location from join
   curiosity_score: number;
   experimentation_score: number;
   learning_score: number;
   innovation_score: number;
   collaboration_score: number;
   created_at: string;
+  updated_at?: string;
 }
 
 // Location options

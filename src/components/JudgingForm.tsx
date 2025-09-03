@@ -12,7 +12,7 @@ import { typographyStyles } from '../utils/ui-helpers';
 export function JudgingForm() {
   const [formData, setFormData] = useState<FormData>({
     participantName: '',
-    teamName: '',
+    teamId: 0, // Initialize as 0 to indicate no selection
     question1: '',
     question2: '',
     question3: '',
@@ -64,9 +64,16 @@ export function JudgingForm() {
     e.preventDefault();
     setError(null);
     
-    const allFieldsFilled = Object.values(formData).every(value => value !== '');
+    // Check all required fields including teamId
+    const requiredFieldsFilled = formData.participantName.trim() && 
+      formData.teamId > 0 && 
+      formData.question1 && 
+      formData.question2 && 
+      formData.question3 && 
+      formData.question4 && 
+      formData.question5;
     
-    if (!allFieldsFilled) {
+    if (!requiredFieldsFilled) {
       setError('Please fill in all fields before submitting.');
       return;
     }
@@ -88,7 +95,7 @@ export function JudgingForm() {
   const handleReset = () => {
     setFormData({
       participantName: '',
-      teamName: '',
+      teamId: 0,
       question1: '',
       question2: '',
       question3: '',
@@ -180,8 +187,16 @@ export function JudgingForm() {
                   Who are you evaluating?
                 </Label>
                 <Select 
-                  value={formData.teamName} 
-                  onValueChange={(value) => handleInputChange('teamName', value)}
+                  value={formData.teamId > 0 ? formData.teamId.toString() : ''} 
+                  onValueChange={(value) => {
+                    const teamId = parseInt(value);
+                    if (teamId > 0) {
+                      setFormData(prev => ({
+                        ...prev,
+                        teamId: teamId
+                      }));
+                    }
+                  }}
                   disabled={teamsLoading || teams.length === 0}
                 >
                   <SelectTrigger 
@@ -206,7 +221,7 @@ export function JudgingForm() {
                       teams.map((team) => (
                         <SelectItem 
                           key={team.id} 
-                          value={getTeamDisplayName(team)}
+                          value={team.id.toString()}
                           style={typographyStyles.body}
                         >
                           {getTeamDisplayName(team)}

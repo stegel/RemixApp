@@ -16,14 +16,15 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS evaluations (
     id SERIAL PRIMARY KEY,
     participant_name VARCHAR(255) NOT NULL,
-    team_name VARCHAR(255) NOT NULL,
+    team_id INTEGER NOT NULL,
     curiosity_score INTEGER NOT NULL CHECK (curiosity_score >= 0 AND curiosity_score <= 4),
     experimentation_score INTEGER NOT NULL CHECK (experimentation_score >= 0 AND experimentation_score <= 4),
     learning_score INTEGER NOT NULL CHECK (learning_score >= 0 AND learning_score <= 4),
     innovation_score INTEGER NOT NULL CHECK (innovation_score >= 0 AND innovation_score <= 4),
     collaboration_score INTEGER NOT NULL CHECK (collaboration_score >= 0 AND collaboration_score <= 4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    CONSTRAINT fk_evaluations_team_id FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
 );
 
 -- Create indexes for teams table
@@ -32,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_teams_active ON teams(is_active);
 CREATE INDEX IF NOT EXISTS idx_teams_team_number ON teams(team_number);
 
 -- Create indexes for better query performance on evaluations
-CREATE INDEX IF NOT EXISTS idx_evaluations_team_name ON evaluations(team_name);
+CREATE INDEX IF NOT EXISTS idx_evaluations_team_id ON evaluations(team_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_participant_name ON evaluations(participant_name);
 CREATE INDEX IF NOT EXISTS idx_evaluations_created_at ON evaluations(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_evaluations_scores ON evaluations(curiosity_score, experimentation_score, learning_score, innovation_score, collaboration_score);
@@ -89,27 +90,31 @@ CREATE POLICY "Allow authenticated users full access to evaluations" ON evaluati
 -- Create a view for team analytics (optional - makes queries easier)
 CREATE OR REPLACE VIEW team_analytics AS
 SELECT 
-    team_name,
-    COUNT(*) as evaluation_count,
-    ROUND(AVG(curiosity_score::numeric), 2) as avg_curiosity,
-    ROUND(AVG(experimentation_score::numeric), 2) as avg_experimentation,
-    ROUND(AVG(learning_score::numeric), 2) as avg_learning,
-    ROUND(AVG(innovation_score::numeric), 2) as avg_innovation,
-    ROUND(AVG(collaboration_score::numeric), 2) as avg_collaboration,
-    ROUND(AVG((curiosity_score + experimentation_score + learning_score + innovation_score + collaboration_score)::numeric / 5), 2) as avg_overall
-FROM evaluations
-GROUP BY team_name
+    t.name as team_name,
+    t.location,
+    COUNT(e.id) as evaluation_count,
+    ROUND(AVG(e.curiosity_score::numeric), 2) as avg_curiosity,
+    ROUND(AVG(e.experimentation_score::numeric), 2) as avg_experimentation,
+    ROUND(AVG(e.learning_score::numeric), 2) as avg_learning,
+    ROUND(AVG(e.innovation_score::numeric), 2) as avg_innovation,
+    ROUND(AVG(e.collaboration_score::numeric), 2) as avg_collaboration,
+    ROUND(AVG((e.curiosity_score + e.experimentation_score + e.learning_score + e.innovation_score + e.collaboration_score)::numeric / 5), 2) as avg_overall
+FROM teams t
+LEFT JOIN evaluations e ON t.id = e.team_id
+WHERE t.is_active = true
+GROUP BY t.id, t.name, t.location
+HAVING COUNT(e.id) > 0  -- Only include teams with evaluations
 ORDER BY avg_overall DESC, evaluation_count DESC;
 
 -- Create a function to get evaluation statistics
 CREATE OR REPLACE FUNCTION get_evaluation_stats()
-RETURNS JSON AS $$
+RETURNS JSON AS $
 DECLARE
     result JSON;
 BEGIN
     SELECT json_build_object(
         'total_evaluations', (SELECT COUNT(*) FROM evaluations),
-        'total_teams', (SELECT COUNT(DISTINCT team_name) FROM evaluations),
+        'total_teams', (SELECT COUNT(DISTINCT team_id) FROM evaluations),
         'total_participants', (SELECT COUNT(DISTINCT participant_name) FROM evaluations),
         'average_overall_score', (SELECT ROUND(AVG((curiosity_score + experimentation_score + learning_score + innovation_score + collaboration_score)::numeric / 5), 2) FROM evaluations),
         'latest_evaluation', (SELECT created_at FROM evaluations ORDER BY created_at DESC LIMIT 1)
@@ -117,29 +122,35 @@ BEGIN
     
     RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create a function to get team rankings
 CREATE OR REPLACE FUNCTION get_team_rankings()
 RETURNS TABLE (
     rank INTEGER,
+    team_id INTEGER,
     team_name VARCHAR(255),
+    team_location VARCHAR(255),
     evaluation_count BIGINT,
     avg_overall_score NUMERIC
-) AS $$
+) AS $
 BEGIN
     RETURN QUERY
     SELECT 
         ROW_NUMBER() OVER (ORDER BY AVG((e.curiosity_score + e.experimentation_score + e.learning_score + e.innovation_score + e.collaboration_score)::numeric / 5) DESC)::INTEGER as rank,
-        e.team_name,
-        COUNT(*)::BIGINT as evaluation_count,
+        t.id,
+        t.name,
+        t.location,
+        COUNT(e.id)::BIGINT as evaluation_count,
         ROUND(AVG((e.curiosity_score + e.experimentation_score + e.learning_score + e.innovation_score + e.collaboration_score)::numeric / 5), 2) as avg_overall_score
-    FROM evaluations e
-    GROUP BY e.team_name
-    HAVING COUNT(*) >= 3  -- Only include teams with at least 3 evaluations
+    FROM teams t
+    JOIN evaluations e ON t.id = e.team_id
+    WHERE t.is_active = true
+    GROUP BY t.id, t.name, t.location
+    HAVING COUNT(e.id) >= 3  -- Only include teams with at least 3 evaluations
     ORDER BY avg_overall_score DESC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant necessary permissions
 GRANT ALL ON teams TO anon;
@@ -190,6 +201,28 @@ INSERT INTO evaluations (participant_name, team_name, curiosity_score, experimen
 ('Henry Clark', 'Product Management', 2, 3, 4, 3, 2);
 */
 
+-- Add evaluations_with_team_names view for easy querying with team information
+CREATE OR REPLACE VIEW evaluations_with_team_names AS
+SELECT 
+    e.id,
+    e.participant_name,
+    e.team_id,
+    COALESCE(t.name, 'Team ' || t.team_number, 'Team #' || t.id) as team_name,
+    t.location as team_location,
+    e.curiosity_score,
+    e.experimentation_score,
+    e.learning_score,
+    e.innovation_score,
+    e.collaboration_score,
+    e.created_at,
+    e.updated_at
+FROM evaluations e
+JOIN teams t ON e.team_id = t.id;
+
+-- Grant permissions on the new view
+GRANT SELECT ON evaluations_with_team_names TO anon;
+GRANT SELECT ON evaluations_with_team_names TO authenticated;
+
 -- Create helpful comments
 COMMENT ON TABLE teams IS 'Stores team information for the AI in The Mix experience simulation';
 COMMENT ON COLUMN teams.team_number IS 'Required unique team number for identification';
@@ -197,9 +230,9 @@ COMMENT ON COLUMN teams.name IS 'Optional unique name of the team';
 COMMENT ON COLUMN teams.location IS 'Team location (Americas, Amsterdam, or Hyderabad)';
 COMMENT ON COLUMN teams.is_active IS 'Whether the team is actively participating';
 
-COMMENT ON TABLE evaluations IS 'Stores team evaluation data from the AI in The Mix experience simulation judging form';
+COMMENT ON TABLE evaluations IS 'Stores team evaluation data from the AI in The Mix experience simulation judging form. Uses team_id foreign key for team relationships.';
 COMMENT ON COLUMN evaluations.participant_name IS 'Name of the person submitting the evaluation';
-COMMENT ON COLUMN evaluations.team_name IS 'Name of the team being evaluated';
+COMMENT ON COLUMN evaluations.team_id IS 'Foreign key reference to teams.id for the team being evaluated';
 COMMENT ON COLUMN evaluations.curiosity_score IS 'Score for team curiosity (0-4 scale: 0=Strongly Disagree, 4=Strongly Agree)';
 COMMENT ON COLUMN evaluations.experimentation_score IS 'Score for team experimentation (0-4 scale: 0=Strongly Disagree, 4=Strongly Agree)';
 COMMENT ON COLUMN evaluations.learning_score IS 'Score for learning provided to judge (0-4 scale: 0=Strongly Disagree, 4=Strongly Agree)';
