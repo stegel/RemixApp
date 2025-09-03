@@ -22,6 +22,7 @@ export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'evaluations' | 'analytics' | 'summary' | 'teams'>('summary');
   const [filterTeam, setFilterTeam] = useState<string>('__all__');
   const [filterParticipant, setFilterParticipant] = useState<string>('');
+  const [filterLocation, setFilterLocation] = useState<string>('__all__');
 
   const loadEvaluations = async () => {
     try {
@@ -250,10 +251,27 @@ export function AdminDashboard() {
 
           {activeTab === 'summary' && (
             <>
+              <div className="flex space-x-4 mb-6">
+                <Select value={filterLocation} onValueChange={setFilterLocation}>
+                  <SelectTrigger className="max-w-sm border-border" style={{ borderRadius: 'var(--radius)' }}>
+                    <SelectValue placeholder="Filter by location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Locations</SelectItem>
+                    <SelectItem value="Americas">Americas</SelectItem>
+                    <SelectItem value="Amsterdam">Amsterdam</SelectItem>
+                    <SelectItem value="Hyderabad">Hyderabad</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {loading ? (
                 <p style={typographyStyles.muted}>Loading team summary...</p>
               ) : (
-                <TeamSummaryTable analytics={analytics} />
+                <TeamSummaryTable 
+                  analytics={filterLocation === '__all__' ? analytics : analytics.filter(team => team.location === filterLocation)}
+                  filteredLocation={filterLocation}
+                />
               )}
             </>
           )}

@@ -9,7 +9,7 @@ export const questions = [
   },
   {
     id: 'question3',
-    text: 'I, as a judge, learned something new from this team'
+    text: 'I, as a judge, learned something new from this team.'
   },
   {
     id: 'question4',
@@ -17,7 +17,7 @@ export const questions = [
   },
   {
     id: 'question5',
-    text: 'The team showed examples of effective collaboration'
+    text: 'The team showed examples of effective collaboration.'
   }
 ];
 

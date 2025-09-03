@@ -136,7 +136,7 @@ export function JudgingForm() {
           Experience Evaluation
         </CardTitle>
         <CardDescription style={typographyStyles.muted}>
-          Please rate your experience with the AI simulation on a scale from Strongly Disagree (0) to Strongly Agree (4).
+          Please rate the team's presentation on a scale from Strongly Disagree (0) to Strongly Agree (4).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -177,7 +177,7 @@ export function JudgingForm() {
                     color: 'var(--foreground)'
                   }}
                 >
-                  Team Name
+                  Who are you evaluating?
                 </Label>
                 <Select 
                   value={formData.teamName} 

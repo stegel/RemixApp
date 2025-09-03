@@ -161,7 +161,13 @@ app.post('/make-server-990f6b7c/teams', async (c) => {
 
     if (error) {
       if (error.code === '23505') { // Unique constraint violation
-        return c.json({ error: 'Team name already exists' }, 409);
+        if (error.message.includes('teams_team_number_key')) {
+          return c.json({ error: 'Team number already exists. Please use a different number.' }, 409);
+        } else if (error.message.includes('teams_name_key')) {
+          return c.json({ error: 'Team name already exists' }, 409);
+        } else {
+          return c.json({ error: 'Team already exists' }, 409);
+        }
       }
       console.error('Database insert error:', error);
       return c.json({ error: 'Failed to create team' }, 500);
@@ -262,7 +268,13 @@ app.put('/make-server-990f6b7c/teams/:id', async (c) => {
         return c.json({ error: 'Team not found' }, 404);
       }
       if (error.code === '23505') {
-        return c.json({ error: 'Team name already exists' }, 409);
+        if (error.message.includes('teams_team_number_key')) {
+          return c.json({ error: 'Team number already exists. Please use a different number.' }, 409);
+        } else if (error.message.includes('teams_name_key')) {
+          return c.json({ error: 'Team name already exists' }, 409);
+        } else {
+          return c.json({ error: 'Team already exists' }, 409);
+        }
       }
       console.error('Database update error:', error);
       return c.json({ error: 'Failed to update team' }, 500);
@@ -322,10 +334,10 @@ app.post('/make-server-990f6b7c/teams/import-csv', async (c) => {
 
         if (error) {
           if (error.code === '23505') { // Unique constraint violation
-            if (error.message.includes('teams_name_key')) {
+            if (error.message.includes('teams_team_number_key')) {
+              results.errors.push(`Row ${rowNumber}: Team number already exists. Please use a different number.`);
+            } else if (error.message.includes('teams_name_key')) {
               results.errors.push(`Row ${rowNumber}: Team name "${team.name}" already exists`);
-            } else if (error.message.includes('teams_team_number_key')) {
-              results.errors.push(`Row ${rowNumber}: Team number "${team.teamNumber}" already exists`);
             } else {
               results.errors.push(`Row ${rowNumber}: Duplicate data conflict`);
             }

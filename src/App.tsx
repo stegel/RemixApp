@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { JudgingForm } from './components/JudgingForm';
 import { AdminDashboard } from './components/AdminDashboard';
+import { TeamRegistration } from './components/TeamRegistration';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Button } from './components/ui/button';
 import { checkDatabaseStatus, DatabaseStatus, refreshSchemaCache } from './utils/database-status';
@@ -8,7 +9,7 @@ import { RefreshCw } from 'lucide-react';
 import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png';
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'form' | 'admin'>('form');
+  const [activeView, setActiveView] = useState<'form' | 'registration' | 'admin'>('form');
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({ isConnected: false, tablesExist: false });
   const [dbStatusLoading, setDbStatusLoading] = useState(true);
 
@@ -58,7 +59,7 @@ export default function App() {
                 fontWeight: 'var(--font-weight-regular)',
                 color: 'var(--muted-foreground)'
               }}>
-                Make sure at least 3 of your team mates judge each presentation you see
+                Please make sure to judge every presentation you hear. We want each team to have at least 3 evaluations submitted.
               </p>
               <div className="mt-2 flex items-center justify-center space-x-2">
                 <div className={`w-2 h-2 rounded-full ${
@@ -107,7 +108,7 @@ export default function App() {
           
           {/* Navigation */}
           {dbStatus.tablesExist && (
-            <div className="flex justify-center space-x-4">
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
               <Button
                 onClick={() => setActiveView('form')}
                 variant={activeView === 'form' ? 'default' : 'outline'}
@@ -115,6 +116,14 @@ export default function App() {
                 style={{ borderRadius: 'var(--radius-button)' }}
               >
                 Submit Evaluation
+              </Button>
+              <Button
+                onClick={() => setActiveView('registration')}
+                variant={activeView === 'registration' ? 'default' : 'outline'}
+                className={activeView === 'registration' ? 'bg-primary text-primary-foreground' : ''}
+                style={{ borderRadius: 'var(--radius-button)' }}
+              >
+                Team Registration
               </Button>
               <Button
                 onClick={() => setActiveView('admin')}
@@ -143,7 +152,9 @@ export default function App() {
             }}
           />
         ) : (
-          activeView === 'form' ? <JudgingForm /> : <AdminDashboard />
+          activeView === 'form' ? <JudgingForm /> : 
+          activeView === 'registration' ? <TeamRegistration /> : 
+          <AdminDashboard />
         )}
       </main>
 
