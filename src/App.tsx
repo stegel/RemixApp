@@ -4,6 +4,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TeamRegistration } from './components/TeamRegistration';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Button } from './components/ui/button';
+import { Analytics } from "@vercel/analytics/next"
 import { checkDatabaseStatus, DatabaseStatus } from './utils/database-status';
 import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png';
 
