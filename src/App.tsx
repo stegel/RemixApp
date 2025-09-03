@@ -9,9 +9,13 @@ import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png'
 
 // Helper functions for URL routing
 function getViewFromPath(pathname: string): 'form' | 'registration' | 'admin' {
-  if (pathname === '/registration') return 'registration';
-  if (pathname === '/admin') return 'admin';
-  return 'form'; // default to form for '/' and '/form'
+  // Clean up the pathname to handle various formats
+  const cleanPath = pathname.toLowerCase().replace(/\/$/, '') || '/';
+  
+  if (cleanPath === '/registration' || cleanPath.endsWith('/registration')) return 'registration';
+  if (cleanPath === '/admin' || cleanPath.endsWith('/admin')) return 'admin';
+  if (cleanPath === '/form' || cleanPath.endsWith('/form')) return 'form';
+  return 'form'; // default to form for '/' and other paths
 }
 
 function getPathFromView(view: 'form' | 'registration' | 'admin'): string {
@@ -53,11 +57,17 @@ export default function App() {
     checkStatus();
   }, []);
 
-  // Listen for browser navigation (back/forward buttons)
+  // Listen for browser navigation (back/forward buttons) and handle direct URL access
   useEffect(() => {
     const handlePopState = () => {
       setActiveView(getViewFromPath(window.location.pathname));
     };
+
+    // Also check for direct URL access on mount
+    const currentView = getViewFromPath(window.location.pathname);
+    if (currentView !== activeView) {
+      setActiveView(currentView);
+    }
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -95,35 +105,35 @@ export default function App() {
             </div>
           </div>
           
-          {/* Navigation */}
-          {dbStatus.tablesExist && (
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-              <Button
-                onClick={() => navigateToView('form')}
-                variant={activeView === 'form' ? 'default' : 'outline'}
-                className={activeView === 'form' ? 'bg-primary text-primary-foreground' : ''}
-                style={{ borderRadius: 'var(--radius-button)' }}
-              >
-                Submit Evaluation
-              </Button>
-              <Button
-                onClick={() => navigateToView('registration')}
-                variant={activeView === 'registration' ? 'default' : 'outline'}
-                className={activeView === 'registration' ? 'bg-primary text-primary-foreground' : ''}
-                style={{ borderRadius: 'var(--radius-button)' }}
-              >
-                Team Registration
-              </Button>
-              <Button
-                onClick={() => navigateToView('admin')}
-                variant={activeView === 'admin' ? 'default' : 'outline'}
-                className={activeView === 'admin' ? 'bg-primary text-primary-foreground' : ''}
-                style={{ borderRadius: 'var(--radius-button)' }}
-              >
-                Admin Dashboard
-              </Button>
-            </div>
-          )}
+          {/* Navigation - Always show navigation for better UX */}
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+            <Button
+              onClick={() => navigateToView('form')}
+              variant={activeView === 'form' ? 'default' : 'outline'}
+              className={activeView === 'form' ? 'bg-primary text-primary-foreground' : ''}
+              style={{ borderRadius: 'var(--radius-button)' }}
+              disabled={!dbStatus.tablesExist && !dbStatusLoading}
+            >
+              Submit Evaluation
+            </Button>
+            <Button
+              onClick={() => navigateToView('registration')}
+              variant={activeView === 'registration' ? 'default' : 'outline'}
+              className={activeView === 'registration' ? 'bg-primary text-primary-foreground' : ''}
+              style={{ borderRadius: 'var(--radius-button)' }}
+            >
+              Team Registration
+            </Button>
+            <Button
+              onClick={() => navigateToView('admin')}
+              variant={activeView === 'admin' ? 'default' : 'outline'}
+              className={activeView === 'admin' ? 'bg-primary text-primary-foreground' : ''}
+              style={{ borderRadius: 'var(--radius-button)' }}
+              disabled={!dbStatus.tablesExist && !dbStatusLoading}
+            >
+              Admin Dashboard
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -152,9 +162,12 @@ export default function App() {
             </div>
           </div>
         ) : (
-          activeView === 'form' ? <JudgingForm /> : 
-          activeView === 'registration' ? <TeamRegistration /> : 
-          <AdminDashboard />
+          <>
+            {/* Render the correct view based on activeView */}
+            {activeView === 'form' && <JudgingForm />}
+            {activeView === 'registration' && <TeamRegistration />}
+            {activeView === 'admin' && <AdminDashboard />}
+          </>
         )}
       </main>
 
