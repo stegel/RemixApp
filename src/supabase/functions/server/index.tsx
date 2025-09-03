@@ -9,9 +9,8 @@ type LocationOption = typeof LOCATION_OPTIONS[number];
 
 const app = new Hono();
 
-// Enable CORS and logging
+// Enable CORS
 app.use("*", cors());
-app.use("*", logger(console.log));
 
 // Create Supabase client
 const supabase = createClient(
@@ -22,7 +21,7 @@ const supabase = createClient(
 // Initialize database tables on startup
 const initializeDatabase = async () => {
   try {
-    console.log('Database already initialized through SQL schema');
+    // Database already initialized through SQL schema
   } catch (err) {
     console.error('Database initialization error:', err);
   }
@@ -57,7 +56,6 @@ app.post('/make-server-990f6b7c/reload-schema', async (c) => {
       // Try alternative method - restart PostgREST by calling a simple query
       try {
         const { error } = await supabase.from('information_schema.tables').select('table_name').limit(1);
-        console.log('Schema cache refreshed via query method');
         return c.json({ success: true, message: 'Schema cache refreshed successfully', method: 'query' });
       } catch (fallbackError) {
         console.error('Schema reload failed:', fallbackError);
@@ -65,7 +63,7 @@ app.post('/make-server-990f6b7c/reload-schema', async (c) => {
       }
     }
 
-    console.log('Schema cache reloaded via PostgREST endpoint');
+
     return c.json({ success: true, message: 'Schema cache reloaded successfully', method: 'postgrest' });
   } catch (error) {
     console.error('Schema reload error:', error);
@@ -87,7 +85,7 @@ app.get('/make-server-990f6b7c/schema-status', async (c) => {
       const { error: teamsError } = await supabase.from('teams').select('id').limit(1);
       checks.teams = !teamsError;
     } catch (err) {
-      console.log('Teams table check failed:', err);
+      // Teams table check failed
     }
 
     // Check if evaluations table exists
@@ -95,7 +93,7 @@ app.get('/make-server-990f6b7c/schema-status', async (c) => {
       const { error: evalsError } = await supabase.from('evaluations').select('id').limit(1);
       checks.evaluations = !evalsError;
     } catch (err) {
-      console.log('Evaluations table check failed:', err);
+      // Evaluations table check failed
     }
 
     // Check if helper functions exist
@@ -103,7 +101,6 @@ app.get('/make-server-990f6b7c/schema-status', async (c) => {
       const { error: funcError } = await supabase.rpc('update_updated_at_column');
       checks.functions = funcError?.message?.includes('does not exist') === false;
     } catch (err) {
-      console.log('Functions check completed with expected error');
       checks.functions = true; // Function exists but errored as expected without parameters
     }
 
@@ -200,7 +197,6 @@ app.get('/make-server-990f6b7c/teams', async (c) => {
       console.error('Database fetch error:', error);
       // If team_number column doesn't exist, try with name ordering
       if (error.code === '42703' && error.message.includes('team_number')) {
-        console.log('team_number column not found, falling back to name ordering');
         
         let fallbackQuery = supabase
           .from('teams')
@@ -695,7 +691,6 @@ app.get('/make-server-990f6b7c/analytics/teams', async (c) => {
       const teamId = evaluation.team_id;
       
       if (!teamInfo || !teamId) {
-        console.warn('Evaluation missing team information:', evaluation);
         return acc;
       }
       

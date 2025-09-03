@@ -4,14 +4,35 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TeamRegistration } from './components/TeamRegistration';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Button } from './components/ui/button';
-import { checkDatabaseStatus, DatabaseStatus, refreshSchemaCache } from './utils/database-status';
-import { RefreshCw } from 'lucide-react';
+import { checkDatabaseStatus, DatabaseStatus } from './utils/database-status';
 import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png';
 
+// Helper functions for URL routing
+function getViewFromPath(pathname: string): 'form' | 'registration' | 'admin' {
+  if (pathname === '/registration') return 'registration';
+  if (pathname === '/admin') return 'admin';
+  return 'form'; // default to form for '/' and '/form'
+}
+
+function getPathFromView(view: 'form' | 'registration' | 'admin'): string {
+  if (view === 'registration') return '/registration';
+  if (view === 'admin') return '/admin';
+  return '/form';
+}
+
 export default function App() {
-  const [activeView, setActiveView] = useState<'form' | 'registration' | 'admin'>('form');
+  const [activeView, setActiveView] = useState<'form' | 'registration' | 'admin'>(() => 
+    getViewFromPath(window.location.pathname)
+  );
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({ isConnected: false, tablesExist: false });
   const [dbStatusLoading, setDbStatusLoading] = useState(true);
+
+  // Handle navigation
+  const navigateToView = (view: 'form' | 'registration' | 'admin') => {
+    const path = getPathFromView(view);
+    window.history.pushState(null, '', path);
+    setActiveView(view);
+  };
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -30,6 +51,16 @@ export default function App() {
     };
 
     checkStatus();
+  }, []);
+
+  // Listen for browser navigation (back/forward buttons)
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveView(getViewFromPath(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   return (
@@ -61,48 +92,6 @@ export default function App() {
               }}>
                 Please make sure to judge every presentation you hear. We want each team to have at least 3 evaluations submitted.
               </p>
-              <div className="mt-2 flex items-center justify-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  dbStatusLoading ? 'bg-muted-foreground' : 
-                  dbStatus.tablesExist ? 'bg-accent' : 
-                  dbStatus.isConnected ? 'bg-primary' : 'bg-destructive'
-                }`}></div>
-                <span style={{ 
-                  fontFamily: 'var(--font-family-lato)', 
-                  fontSize: 'var(--text-label)', 
-                  fontWeight: 'var(--font-weight-regular)',
-                  color: dbStatusLoading ? 'var(--muted-foreground)' :
-                         dbStatus.tablesExist ? 'var(--accent)' : 
-                         dbStatus.isConnected ? 'var(--primary)' : 'var(--destructive)'
-                }}>
-                  {dbStatusLoading ? 'Checking database...' :
-                   dbStatus.tablesExist ? 'Database Ready' :
-                   dbStatus.isConnected ? 'Database Setup Required' : 'Database Connection Error'}
-                </span>
-                {dbStatus.isConnected && !dbStatusLoading && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                      setDbStatusLoading(true);
-                      try {
-                        await refreshSchemaCache();
-                        setTimeout(async () => {
-                          const status = await checkDatabaseStatus();
-                          setDbStatus(status);
-                          setDbStatusLoading(false);
-                        }, 2000);
-                      } catch (error) {
-                        setDbStatusLoading(false);
-                      }
-                    }}
-                    className="h-6 px-2 text-xs"
-                    style={{ borderRadius: 'var(--radius-button)' }}
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
             </div>
           </div>
           
@@ -110,7 +99,7 @@ export default function App() {
           {dbStatus.tablesExist && (
             <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
               <Button
-                onClick={() => setActiveView('form')}
+                onClick={() => navigateToView('form')}
                 variant={activeView === 'form' ? 'default' : 'outline'}
                 className={activeView === 'form' ? 'bg-primary text-primary-foreground' : ''}
                 style={{ borderRadius: 'var(--radius-button)' }}
@@ -118,7 +107,7 @@ export default function App() {
                 Submit Evaluation
               </Button>
               <Button
-                onClick={() => setActiveView('registration')}
+                onClick={() => navigateToView('registration')}
                 variant={activeView === 'registration' ? 'default' : 'outline'}
                 className={activeView === 'registration' ? 'bg-primary text-primary-foreground' : ''}
                 style={{ borderRadius: 'var(--radius-button)' }}
@@ -126,7 +115,7 @@ export default function App() {
                 Team Registration
               </Button>
               <Button
-                onClick={() => setActiveView('admin')}
+                onClick={() => navigateToView('admin')}
                 variant={activeView === 'admin' ? 'default' : 'outline'}
                 className={activeView === 'admin' ? 'bg-primary text-primary-foreground' : ''}
                 style={{ borderRadius: 'var(--radius-button)' }}
@@ -151,6 +140,17 @@ export default function App() {
               setDbStatusLoading(false);
             }}
           />
+        ) : dbStatusLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div style={{ 
+              fontFamily: 'var(--font-family-lato)', 
+              fontSize: 'var(--text-base)', 
+              fontWeight: 'var(--font-weight-regular)',
+              color: 'var(--muted-foreground)'
+            }}>
+              Loading...
+            </div>
+          </div>
         ) : (
           activeView === 'form' ? <JudgingForm /> : 
           activeView === 'registration' ? <TeamRegistration /> : 

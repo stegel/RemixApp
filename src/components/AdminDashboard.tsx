@@ -1,28 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { EvaluationsTable } from './EvaluationsTable';
 import { AnalyticsTable } from './AnalyticsTable';
-import { TeamSummaryTable } from './TeamSummaryTable';
+import { SimpleTeamSummary } from './SimpleTeamSummary';
 import { TeamsManagement } from './TeamsManagement';
 import { fetchEvaluations, fetchAnalytics, deleteEvaluation, Evaluation, TeamAnalytics } from '../utils/api';
 import { typographyStyles } from '../utils/ui-helpers';
-import { Lock } from 'lucide-react';
+// import { AdminAuth } from './admin/AdminAuth';
+// import { AdminNavigation } from './admin/AdminNavigation';
+// import { LocationTabs } from './admin/LocationTabs';
+// import { ErrorDisplay } from './admin/ErrorDisplay';
+// import { EvaluationsFilters } from './admin/EvaluationsFilters';
+// import { AdminTabId, LocationValue } from './admin/constants';
+
+type AdminTabId = 'evaluations' | 'analytics' | 'summary' | 'teams';
+type LocationValue = '__all__' | 'Americas' | 'Amsterdam' | 'Hyderabad';
+
+function isDatabaseError(error: string | null | undefined): boolean {
+  return !!error && error.includes('Could not find the table');
+}
+
+function isSchemaUpdateRequired(error: string | null | undefined): boolean {
+  return !!error && error.includes('location') && error.includes('does not exist');
+}
 
 export function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [analytics, setAnalytics] = useState<TeamAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'evaluations' | 'analytics' | 'summary' | 'teams'>('summary');
+  const [activeTab, setActiveTab] = useState<AdminTabId>('summary');
   const [filterTeam, setFilterTeam] = useState<string>('__all__');
   const [filterParticipant, setFilterParticipant] = useState<string>('');
-  const [filterLocation, setFilterLocation] = useState<string>('__all__');
+  const [filterLocation, setFilterLocation] = useState<LocationValue>('__all__');
 
   const loadEvaluations = async () => {
     try {
@@ -31,7 +42,7 @@ export function AdminDashboard() {
       setEvaluations(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch evaluations';
-      if (errorMessage.includes('Could not find the table')) {
+      if (isDatabaseError(errorMessage)) {
         setError('Database tables not found. Please run the database schema SQL script in your Supabase SQL Editor first.');
       } else {
         setError(errorMessage);
@@ -45,9 +56,9 @@ export function AdminDashboard() {
       setAnalytics(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
-      if (errorMessage.includes('Could not find the table')) {
+      if (isDatabaseError(errorMessage)) {
         setError('Database tables not found. Please run the database schema SQL script in your Supabase SQL Editor first.');
-      } else if (errorMessage.includes('location') && errorMessage.includes('does not exist')) {
+      } else if (isSchemaUpdateRequired(errorMessage)) {
         setError('Database schema update required: The teams table is missing the "location" column. Please run the migration script from /migration-script.sql to add this field.');
       } else {
         setError(errorMessage);
@@ -90,27 +101,12 @@ export function AdminDashboard() {
 
   const uniqueTeams = [...new Set(evaluations.map(e => e.team_name))];
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'remix2025') {
-      setIsAuthenticated(true);
-      setPasswordError('');
-    } else {
-      setPasswordError('Incorrect password. Please try again.');
-    }
-  };
-
   // Show password screen if not authenticated
   if (!isAuthenticated) {
     return (
       <div className="w-full max-w-md mx-auto">
         <Card style={{ borderRadius: 'var(--radius-card)' }}>
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 rounded-full bg-primary/10">
-                <Lock className="w-6 h-6 text-primary" />
-              </div>
-            </div>
             <CardTitle style={typographyStyles.h2}>
               Admin Access Required
             </CardTitle>
@@ -119,33 +115,31 @@ export function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <Input
-                  type="password"
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ borderRadius: 'var(--radius)' }}
-                  className="w-full border-border"
-                />
-                {passwordError && (
-                  <p className="mt-2 text-sm text-destructive" style={{ 
-                    fontFamily: 'var(--font-family-lato)', 
-                    fontSize: 'var(--text-label)', 
-                    fontWeight: 'var(--font-weight-regular)'
-                  }}>
-                    {passwordError}
-                  </p>
-                )}
-              </div>
-              <Button
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              const password = formData.get('password') as string;
+              if (password === 'remix2025') {
+                setIsAuthenticated(true);
+              } else {
+                alert('Incorrect password');
+              }
+            }} className="space-y-4">
+              <input
+                type="password"
+                name="password"
+                placeholder="Enter admin password"
+                className="w-full p-2 border border-border"
+                style={{ borderRadius: 'var(--radius-button)', backgroundColor: 'var(--input-background)' }}
+                required
+              />
+              <button
                 type="submit"
-                className="w-full bg-primary text-primary-foreground"
+                className="w-full bg-primary text-primary-foreground p-2"
                 style={{ borderRadius: 'var(--radius-button)' }}
               >
                 Access Dashboard
-              </Button>
+              </button>
             </form>
           </CardContent>
         </Card>
@@ -165,80 +159,54 @@ export function AdminDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex space-x-2 mb-6">
-            <Button
-              onClick={() => setActiveTab('evaluations')}
-              variant={activeTab === 'evaluations' ? 'default' : 'outline'}
-              className={activeTab === 'evaluations' ? 'bg-primary text-primary-foreground' : ''}
-              style={{ borderRadius: 'var(--radius-button)' }}
-            >
-              Evaluations
-            </Button>
-            <Button
-              onClick={() => setActiveTab('summary')}
-              variant={activeTab === 'summary' ? 'default' : 'outline'}
-              className={activeTab === 'summary' ? 'bg-primary text-primary-foreground' : ''}
-              style={{ borderRadius: 'var(--radius-button)' }}
-            >
-              Team Summary
-            </Button>
-            <Button
-              onClick={() => setActiveTab('analytics')}
-              variant={activeTab === 'analytics' ? 'default' : 'outline'}
-              className={activeTab === 'analytics' ? 'bg-primary text-primary-foreground' : ''}
-              style={{ borderRadius: 'var(--radius-button)' }}
-            >
-              Detailed Analytics
-            </Button>
-            <Button
-              onClick={() => setActiveTab('teams')}
-              variant={activeTab === 'teams' ? 'default' : 'outline'}
-              className={activeTab === 'teams' ? 'bg-primary text-primary-foreground' : ''}
-              style={{ borderRadius: 'var(--radius-button)' }}
-            >
-              Teams
-            </Button>
+          <div 
+            className="flex space-x-2 mb-6 p-2 border border-border"
+            style={{ borderRadius: 'var(--radius)', backgroundColor: 'var(--card)' }}
+          >
+            {['evaluations', 'summary', 'analytics', 'teams'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as AdminTabId)}
+                className={activeTab === tab ? 'bg-primary text-primary-foreground px-4 py-2' : 'bg-muted px-4 py-2'}
+                style={{ borderRadius: 'var(--radius-button)' }}
+              >
+                {tab === 'evaluations' ? 'Evaluations' :
+                 tab === 'summary' ? 'Team Summary' :
+                 tab === 'analytics' ? 'Detailed Analytics' : 'Teams'}
+              </button>
+            ))}
           </div>
 
-          {error && (
-            <div className="p-4 rounded-md border border-destructive bg-destructive/10 text-destructive mb-6" style={{ borderRadius: 'var(--radius)' }}>
-              <p>{error}</p>
-              {error.includes('Database tables not found') && (
-                <div className="mt-3 p-3 bg-muted rounded" style={{ borderRadius: 'var(--radius)' }}>
-                  <p className="text-sm font-semibold mb-2 text-foreground">To fix this error:</p>
-                  <ol className="text-sm space-y-1 list-decimal list-inside text-muted-foreground">
-                    <li>Go to your Supabase Dashboard</li>
-                    <li>Navigate to the SQL Editor</li>
-                    <li>Copy and paste the contents of <code>/database-schema.sql</code></li>
-                    <li>Run the SQL script to create the required tables</li>
-                    <li>Refresh this page</li>
-                  </ol>
-                </div>
-              )}
-            </div>
-          )}
+          {error && <div className="p-4 rounded-md border border-destructive bg-destructive/10 text-destructive mb-6">{error}</div>}
 
           {activeTab === 'evaluations' && (
             <>
-              <div className="flex space-x-4 mb-6">
-                <Input
-                  placeholder="Filter by participant name..."
-                  value={filterParticipant}
-                  onChange={(e) => setFilterParticipant(e.target.value)}
-                  className="max-w-sm border-border"
-                  style={{ borderRadius: 'var(--radius)' }}
-                />
-                <Select value={filterTeam} onValueChange={setFilterTeam}>
-                  <SelectTrigger className="max-w-sm border-border" style={{ borderRadius: 'var(--radius)' }}>
-                    <SelectValue placeholder="Filter by team..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All Teams</SelectItem>
-                    {uniqueTeams.map((team) => (
-                      <SelectItem key={team} value={team}>{team}</SelectItem>
+              <div className="mb-4 flex flex-wrap gap-4">
+                <div>
+                  <label style={{ ...typographyStyles.label, display: 'block', marginBottom: '4px' }}>Filter by Team:</label>
+                  <select
+                    value={filterTeam}
+                    onChange={(e) => setFilterTeam(e.target.value)}
+                    className="px-3 py-2 border border-border"
+                    style={{ borderRadius: 'var(--radius-button)', backgroundColor: 'var(--input-background)' }}
+                  >
+                    <option value="__all__">All Teams</option>
+                    {uniqueTeams.map(team => (
+                      <option key={team} value={team}>{team}</option>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ ...typographyStyles.label, display: 'block', marginBottom: '4px' }}>Filter by Participant:</label>
+                  <input
+                    type="text"
+                    value={filterParticipant}
+                    onChange={(e) => setFilterParticipant(e.target.value)}
+                    placeholder="Enter participant name"
+                    className="px-3 py-2 border border-border"
+                    style={{ borderRadius: 'var(--radius-button)', backgroundColor: 'var(--input-background)' }}
+                  />
+                </div>
               </div>
 
               {loading ? (
@@ -251,27 +219,47 @@ export function AdminDashboard() {
 
           {activeTab === 'summary' && (
             <>
-              <div className="flex space-x-4 mb-6">
-                <Select value={filterLocation} onValueChange={setFilterLocation}>
-                  <SelectTrigger className="max-w-sm border-border" style={{ borderRadius: 'var(--radius)' }}>
-                    <SelectValue placeholder="Filter by location..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All Locations</SelectItem>
-                    <SelectItem value="Americas">Americas</SelectItem>
-                    <SelectItem value="Amsterdam">Amsterdam</SelectItem>
-                    <SelectItem value="Hyderabad">Hyderabad</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               {loading ? (
                 <p style={typographyStyles.muted}>Loading team summary...</p>
               ) : (
-                <TeamSummaryTable 
-                  analytics={filterLocation === '__all__' ? analytics : analytics.filter(team => team.location === filterLocation)}
-                  filteredLocation={filterLocation}
-                />
+                <div>
+                  <div className="mb-6">
+                    <div 
+                      className="grid w-full grid-cols-4 gap-1 bg-muted p-1 border border-border" 
+                      style={{ borderRadius: 'var(--radius)' }}
+                    >
+                      {[
+                        { value: '__all__', label: 'All Locations' },
+                        { value: 'Americas', label: 'Americas' },
+                        { value: 'Amsterdam', label: 'Amsterdam' },
+                        { value: 'Hyderabad', label: 'Hyderabad' }
+                      ].map(location => (
+                        <button
+                          key={location.value}
+                          onClick={() => setFilterLocation(location.value as LocationValue)}
+                          className={filterLocation === location.value ? 
+                            'bg-primary text-primary-foreground px-3 py-2 flex flex-col items-center' : 
+                            'px-3 py-2 flex flex-col items-center'}
+                          style={{ borderRadius: 'var(--radius-button)' }}
+                        >
+                          <span>{location.label}</span>
+                          <span style={{ fontSize: 'var(--text-label)', opacity: 0.7 }}>
+                            ({location.value === '__all__' ? analytics.length : 
+                              analytics.filter(team => team.location === location.value).length} teams)
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <SimpleTeamSummary 
+                      analytics={filterLocation === '__all__' ? 
+                        analytics : 
+                        analytics.filter(team => team.location === filterLocation)
+                      } 
+                    />
+                  </div>
+                </div>
               )}
             </>
           )}
