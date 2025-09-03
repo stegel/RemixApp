@@ -1,20 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/((?!api|_next/static|_next/image|favicon.ico|supabase|.*\\.).*))",
+      "source": "/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
-    {
-      "source": "/index.html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
     {
       "source": "/(.*)",
       "headers": [
