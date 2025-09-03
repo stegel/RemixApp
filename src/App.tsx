@@ -8,7 +8,7 @@ import {
   checkDatabaseStatus,
   DatabaseStatus,
 } from "./utils/database-status";
-import logoImage from "figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png";
+import { ImageWithFallback } from "./components/figma/ImageWithFallback";
 
 // Helper functions for URL routing
 function getViewFromPath(
@@ -45,7 +45,13 @@ function getPathFromView(
 export default function App() {
   const [activeView, setActiveView] = useState<
     "form" | "registration" | "admin"
-  >(() => getViewFromPath(window.location.pathname));
+  >(() => {
+    if (typeof window !== 'undefined') {
+      console.log('🔧 Initial path:', window.location.pathname);
+      return getViewFromPath(window.location.pathname);
+    }
+    return "form";
+  });
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
     isConnected: false,
     tablesExist: false,
@@ -103,8 +109,8 @@ export default function App() {
       <header className="w-full py-8 px-4 border-b border-border">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center space-y-4 mb-6">
-            <img
-              src={logoImage}
+            <ImageWithFallback
+              src="https://images.unsplash.com/photo-1628760584600-6c31148991e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjB0ZWNoJTIwbG9nb3xlbnwxfHx8fDE3NTY5MzM5MDN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
               alt="ServiceNow ReMix Logo"
               className="h-16 w-auto"
             />
