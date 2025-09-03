@@ -4,14 +4,13 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TeamRegistration } from './components/TeamRegistration';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Button } from './components/ui/button';
-import { Analytics } from "@vercel/analytics/next"
 import { checkDatabaseStatus, DatabaseStatus } from './utils/database-status';
 import logoImage from 'figma:asset/dfe0aec21d1e3b52b0e6ae5edc87b575eb3c88e6.png';
 
 // Helper functions for URL routing
 function getViewFromPath(pathname: string): 'form' | 'registration' | 'admin' {
-  // Clean up the pathname to handle various formats
-  const cleanPath = pathname.toLowerCase().replace(/\/$/, '') || '/';
+  // Clean up the pathname to handle various formats and remove query params/hash
+  const cleanPath = pathname.split('?')[0].split('#')[0].toLowerCase().replace(/\/$/, '') || '/';
   
   if (cleanPath === '/registration' || cleanPath.endsWith('/registration')) return 'registration';
   if (cleanPath === '/admin' || cleanPath.endsWith('/admin')) return 'admin';
@@ -64,11 +63,9 @@ export default function App() {
       setActiveView(getViewFromPath(window.location.pathname));
     };
 
-    // Also check for direct URL access on mount
+    // Ensure direct URL access works on mount
     const currentView = getViewFromPath(window.location.pathname);
-    if (currentView !== activeView) {
-      setActiveView(currentView);
-    }
+    setActiveView(currentView);
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
