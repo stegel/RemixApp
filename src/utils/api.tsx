@@ -143,6 +143,29 @@ export const deleteEvaluation = async (id: number): Promise<void> => {
   }
 };
 
+export const deleteAllEvaluations = async (): Promise<{ deletedCount: number; message: string }> => {
+  const response = await fetch(
+    `${API_BASE_URL}/evaluations`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${publicAnonKey}`
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to delete all evaluations');
+  }
+
+  const result = await response.json();
+  return {
+    deletedCount: result.deletedCount,
+    message: result.message
+  };
+};
+
 // TEAM API FUNCTIONS
 
 export const createTeam = async (teamData: TeamInput): Promise<Team> => {
@@ -219,6 +242,29 @@ export const deleteTeam = async (id: number): Promise<void> => {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Failed to delete team');
   }
+};
+
+export const deleteAllTeams = async (): Promise<{ deletedCount: number; message: string }> => {
+  const response = await fetch(
+    `${API_BASE_URL}/teams`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${publicAnonKey}`
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to delete all teams');
+  }
+
+  const result = await response.json();
+  return {
+    deletedCount: result.deletedCount,
+    message: result.message
+  };
 };
 
 export const importTeamsFromCSV = async (teams: CSVTeamInput[]): Promise<{ success: number; errors: string[] }> => {

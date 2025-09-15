@@ -5,9 +5,12 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { questions, scaleOptions } from './constants';
 import { submitEvaluation, FormData, fetchTeams, Team, getTeamDisplayName } from '../utils/api';
 import { typographyStyles } from '../utils/ui-helpers';
+import { Check, ChevronsUpDown } from 'lucide-react';
 
 export function JudgingForm() {
   const [formData, setFormData] = useState<FormData>({
@@ -24,6 +27,7 @@ export function JudgingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [teamsLoading, setTeamsLoading] = useState(true);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
 
   const loadTeams = async () => {
     try {
@@ -186,50 +190,66 @@ export function JudgingForm() {
                 >
                   Who are you evaluating?
                 </Label>
-                <Select 
-                  value={formData.teamId > 0 ? formData.teamId.toString() : ''} 
-                  onValueChange={(value) => {
-                    const teamId = parseInt(value);
-                    if (teamId > 0) {
-                      setFormData(prev => ({
-                        ...prev,
-                        teamId: teamId
-                      }));
-                    }
-                  }}
-                  disabled={teamsLoading || teams.length === 0}
-                >
-                  <SelectTrigger 
-                    className="bg-input-background border-border"
-                    style={{ 
-                      borderRadius: 'var(--radius)',
-                      ...typographyStyles.body
-                    }}
-                  >
-                    <SelectValue placeholder={
-                      teamsLoading ? "Loading teams..." : 
-                      teams.length === 0 ? "No teams available" : 
-                      "Select team to evaluate"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent style={{ borderRadius: 'var(--radius)' }}>
-                    {teams.length === 0 ? (
-                      <SelectItem value="__no_teams__" disabled style={typographyStyles.muted}>
-                        No teams available
-                      </SelectItem>
-                    ) : (
-                      teams.map((team) => (
-                        <SelectItem 
-                          key={team.id} 
-                          value={team.id.toString()}
-                          style={typographyStyles.body}
-                        >
-                          {getTeamDisplayName(team)}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Popover open={teamDropdownOpen} onOpenChange={setTeamDropdownOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={teamDropdownOpen}
+                      className="w-full justify-between bg-input-background border-border hover:bg-input-background"
+                      style={{ 
+                        borderRadius: 'var(--radius)',
+                        ...typographyStyles.body,
+                        fontWeight: 'var(--font-weight-regular)'
+                      }}
+                      disabled={teamsLoading || teams.length === 0}
+                    >
+                      {formData.teamId > 0
+                        ? getTeamDisplayName(teams.find((team) => team.id === formData.teamId) || teams[0])
+                        : (teamsLoading ? "Loading teams..." : 
+                           teams.length === 0 ? "No teams available" : 
+                           "Select team to evaluate")}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" style={{ borderRadius: 'var(--radius)' }}>
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search teams..." 
+                        className="h-9"
+                        style={typographyStyles.body}
+                      />
+                      <CommandList>
+                        <CommandEmpty style={typographyStyles.muted}>
+                          No teams found.
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {teams.map((team) => (
+                            <CommandItem
+                              key={team.id}
+                              value={getTeamDisplayName(team)}
+                              onSelect={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  teamId: team.id
+                                }));
+                                setTeamDropdownOpen(false);
+                              }}
+                              style={typographyStyles.body}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  formData.teamId === team.id ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              {getTeamDisplayName(team)}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>

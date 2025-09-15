@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from './ui/alert-dialog';
 import { EvaluationsTable } from './EvaluationsTable';
 import { AnalyticsTable } from './AnalyticsTable';
 import { SimpleTeamSummary } from './SimpleTeamSummary';
 import { TeamsManagement } from './TeamsManagement';
-import { fetchEvaluations, fetchAnalytics, deleteEvaluation, Evaluation, TeamAnalytics } from '../utils/api';
+import { fetchEvaluations, fetchAnalytics, deleteEvaluation, deleteAllEvaluations, deleteAllTeams, Evaluation, TeamAnalytics } from '../utils/api';
 import { typographyStyles } from '../utils/ui-helpers';
+import { Trash2 } from 'lucide-react';
 // import { AdminAuth } from './admin/AdminAuth';
 // import { AdminNavigation } from './admin/AdminNavigation';
 // import { LocationTabs } from './admin/LocationTabs';
@@ -76,6 +89,35 @@ export function AdminDashboard() {
       await loadEvaluations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete evaluation');
+    }
+  };
+
+  const handleDeleteAllEvaluations = async () => {
+    try {
+      setLoading(true);
+      const result = await deleteAllEvaluations();
+      await loadEvaluations();
+      await loadAnalytics(); // Refresh analytics too since they depend on evaluations
+      setError(null);
+      // Could show a success message here if desired
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete all evaluations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAllTeams = async () => {
+    try {
+      setLoading(true);
+      const result = await deleteAllTeams();
+      await loadAnalytics(); // Refresh analytics since they depend on teams
+      setError(null);
+      // Could show a success message here if desired
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete all teams');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -181,7 +223,7 @@ export function AdminDashboard() {
 
           {activeTab === 'evaluations' && (
             <>
-              <div className="mb-4 flex flex-wrap gap-4">
+              <div className="mb-4 flex flex-wrap gap-4 items-end">
                 <div>
                   <label style={{ ...typographyStyles.label, display: 'block', marginBottom: '4px' }}>Filter by Team:</label>
                   <select
@@ -206,6 +248,44 @@ export function AdminDashboard() {
                     className="px-3 py-2 border border-border"
                     style={{ borderRadius: 'var(--radius-button)', backgroundColor: 'var(--input-background)' }}
                   />
+                </div>
+                <div className="ml-auto">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={loading || evaluations.length === 0}
+                        style={{ borderRadius: 'var(--radius-button)' }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete All Evaluations
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent style={{ borderRadius: 'var(--radius-card)' }}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle style={typographyStyles.h3}>
+                          Delete All Evaluations
+                        </AlertDialogTitle>
+                        <AlertDialogDescription style={typographyStyles.muted}>
+                          This action cannot be undone. This will permanently delete all {evaluations.length} evaluations from the database.
+                          <br /><br />
+                          <strong>Are you absolutely sure you want to continue?</strong>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel style={{ borderRadius: 'var(--radius-button)' }}>
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDeleteAllEvaluations}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          style={{ borderRadius: 'var(--radius-button)' }}
+                        >
+                          Yes, Delete All Evaluations
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
 

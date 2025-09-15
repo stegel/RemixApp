@@ -398,6 +398,60 @@ app.delete('/make-server-990f6b7c/teams/:id', async (c) => {
   }
 });
 
+// DELETE ALL - Delete all teams (bulk delete)
+app.delete('/make-server-990f6b7c/teams', async (c) => {
+  try {
+    // Check if any teams have evaluations
+    const { data: evaluations, error: evalError } = await supabase
+      .from('evaluations')
+      .select('team_id')
+      .limit(1);
+
+    if (evalError) {
+      console.error('Error checking evaluations:', evalError);
+      return c.json({ error: 'Failed to check team evaluations' }, 500);
+    }
+
+    if (evaluations && evaluations.length > 0) {
+      return c.json({ error: 'Cannot delete teams with existing evaluations. Please delete all evaluations first.' }, 409);
+    }
+
+    // Get count of teams before deletion for confirmation
+    const { count: teamCount, error: countError } = await supabase
+      .from('teams')
+      .select('id', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('Error counting teams:', countError);
+      return c.json({ error: 'Failed to count teams' }, 500);
+    }
+
+    if (teamCount === 0) {
+      return c.json({ success: true, message: 'No teams to delete', deletedCount: 0 });
+    }
+
+    // Delete all teams
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .neq('id', 0); // This will match all rows
+
+    if (error) {
+      console.error('Database bulk delete error:', error);
+      return c.json({ error: 'Failed to delete all teams' }, 500);
+    }
+
+    return c.json({ 
+      success: true, 
+      message: `Successfully deleted all ${teamCount} teams`, 
+      deletedCount: teamCount 
+    });
+  } catch (error) {
+    console.error('Delete all teams error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // EVALUATION ENDPOINTS
 
 // CREATE - Submit a new evaluation
@@ -651,6 +705,45 @@ app.delete('/make-server-990f6b7c/evaluations/:id', async (c) => {
     return c.json({ success: true, message: 'Evaluation deleted successfully' });
   } catch (error) {
     console.error('Delete evaluation error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// DELETE ALL - Delete all evaluations (bulk delete)
+app.delete('/make-server-990f6b7c/evaluations', async (c) => {
+  try {
+    // Get count of evaluations before deletion for confirmation
+    const { count: evaluationCount, error: countError } = await supabase
+      .from('evaluations')
+      .select('id', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('Error counting evaluations:', countError);
+      return c.json({ error: 'Failed to count evaluations' }, 500);
+    }
+
+    if (evaluationCount === 0) {
+      return c.json({ success: true, message: 'No evaluations to delete', deletedCount: 0 });
+    }
+
+    // Delete all evaluations
+    const { error } = await supabase
+      .from('evaluations')
+      .delete()
+      .neq('id', 0); // This will match all rows
+
+    if (error) {
+      console.error('Database bulk delete error:', error);
+      return c.json({ error: 'Failed to delete all evaluations' }, 500);
+    }
+
+    return c.json({ 
+      success: true, 
+      message: `Successfully deleted all ${evaluationCount} evaluations`, 
+      deletedCount: evaluationCount 
+    });
+  } catch (error) {
+    console.error('Delete all evaluations error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

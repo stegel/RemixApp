@@ -6,9 +6,20 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from './ui/alert-dialog';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
-import { fetchTeams, createTeam, updateTeam, deleteTeam, importTeamsFromCSV, Team, TeamInput, CSVTeamInput, LOCATION_OPTIONS, LocationOption, getTeamDisplayName } from '../utils/api';
+import { fetchTeams, createTeam, updateTeam, deleteTeam, deleteAllTeams, importTeamsFromCSV, Team, TeamInput, CSVTeamInput, LOCATION_OPTIONS, LocationOption, getTeamDisplayName } from '../utils/api';
 import { typographyStyles } from '../utils/ui-helpers';
 import { Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
 
@@ -101,6 +112,20 @@ export function TeamsManagement() {
       await loadTeams();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete team');
+    }
+  };
+
+  const handleDeleteAllTeams = async () => {
+    try {
+      setLoading(true);
+      const result = await deleteAllTeams();
+      await loadTeams();
+      setError(null);
+      // Could show a success message here if desired
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete all teams');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -223,6 +248,46 @@ export function TeamsManagement() {
               </CardDescription>
             </div>
             <div className="flex space-x-2">
+              {/* Delete All Teams Button */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={loading || teams.length === 0}
+                    style={{ borderRadius: 'var(--radius-button)' }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete All Teams
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent style={{ borderRadius: 'var(--radius-card)' }}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle style={typographyStyles.h3}>
+                      Delete All Teams
+                    </AlertDialogTitle>
+                    <AlertDialogDescription style={typographyStyles.muted}>
+                      This action cannot be undone. This will permanently delete all {teams.length} teams from the database.
+                      <br /><br />
+                      <strong>Note:</strong> Teams with existing evaluations cannot be deleted. Delete all evaluations first if you want to remove those teams.
+                      <br /><br />
+                      <strong>Are you absolutely sure you want to continue?</strong>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel style={{ borderRadius: 'var(--radius-button)' }}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDeleteAllTeams}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      style={{ borderRadius: 'var(--radius-button)' }}
+                    >
+                      Yes, Delete All Teams
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               {/* CSV Import Button */}
               <Dialog open={csvImportOpen} onOpenChange={setCsvImportOpen}>
                 <DialogTrigger asChild>
