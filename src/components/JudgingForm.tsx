@@ -205,7 +205,10 @@ export function JudgingForm() {
                       disabled={teamsLoading || teams.length === 0}
                     >
                       {formData.teamId > 0
-                        ? getTeamDisplayName(teams.find((team) => team.id === formData.teamId) || teams[0])
+                        ? (() => {
+                            const selectedTeam = teams.find((team) => team.id === formData.teamId) || teams[0];
+                            return `${getTeamDisplayName(selectedTeam)} (${selectedTeam.location})`;
+                          })()
                         : (teamsLoading ? "Loading teams..." : 
                            teams.length === 0 ? "No teams available" : 
                            "Select team to evaluate")}
@@ -242,7 +245,7 @@ export function JudgingForm() {
                                   formData.teamId === team.id ? "opacity-100" : "opacity-0"
                                 }`}
                               />
-                              {getTeamDisplayName(team)}
+                              {getTeamDisplayName(team)} ({team.location})
                             </CommandItem>
                           ))}
                         </CommandGroup>
