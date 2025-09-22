@@ -227,6 +227,25 @@ export const updateTeam = async (id: number, teamData: TeamInput): Promise<Team>
   return result.data;
 };
 
+export const updateTeamNameByNumber = async (teamNumber: number, newName: string): Promise<Team> => {
+  const response = await fetch(`${API_BASE_URL}/teams/by-number/${teamNumber}/name`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${publicAnonKey}`
+    },
+    body: JSON.stringify({ name: newName })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to update team name');
+  }
+
+  const result = await response.json();
+  return result.data;
+};
+
 export const deleteTeam = async (id: number): Promise<void> => {
   const response = await fetch(
     `${API_BASE_URL}/teams/${id}`,

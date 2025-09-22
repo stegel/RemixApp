@@ -16,6 +16,7 @@ import { EvaluationsTable } from './EvaluationsTable';
 import { AnalyticsTable } from './AnalyticsTable';
 import { SimpleTeamSummary } from './SimpleTeamSummary';
 import { TeamsManagement } from './TeamsManagement';
+import { TeamNameUpdater } from './TeamNameUpdater';
 import { fetchEvaluations, fetchAnalytics, deleteEvaluation, deleteAllEvaluations, deleteAllTeams, Evaluation, TeamAnalytics } from '../utils/api';
 import { typographyStyles } from '../utils/ui-helpers';
 import { Trash2 } from 'lucide-react';
@@ -178,7 +179,10 @@ export function AdminDashboard() {
               <button
                 type="submit"
                 className="w-full bg-primary text-primary-foreground p-2"
-                style={{ borderRadius: 'var(--radius-button)' }}
+                style={{ 
+                  borderRadius: 'var(--radius-button)',
+                  textAlign: 'center'
+                }}
               >
                 Access Dashboard
               </button>
@@ -354,7 +358,12 @@ export function AdminDashboard() {
             </>
           )}
 
-          {activeTab === 'teams' && <TeamsManagement />}
+          {activeTab === 'teams' && (
+            <div className="space-y-6">
+              <TeamNameUpdater />
+              <TeamsManagement />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

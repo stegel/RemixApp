@@ -74,7 +74,14 @@ export default function App() {
               >
                 Submit Evaluation
               </Button>
-             
+              <Button
+                onClick={() => setActiveView('registration')}
+                variant={activeView === 'registration' ? 'default' : 'outline'}
+                className={activeView === 'registration' ? 'bg-primary text-primary-foreground' : ''}
+                style={{ borderRadius: 'var(--radius-button)' }}
+              >
+                Team Registration
+              </Button>
               <Button
                 onClick={() => setActiveView('admin')}
                 variant={activeView === 'admin' ? 'default' : 'outline'}

@@ -283,6 +283,107 @@ app.put('/make-server-990f6b7c/teams/:id', async (c) => {
   }
 });
 
+// UPDATE TEAM NAME ONLY - Update just the name of a team
+app.put('/make-server-990f6b7c/teams/:id/name', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { name } = body;
+
+    // Validate required field
+    if (!name?.trim()) {
+      return c.json({ error: 'Team name is required' }, 400);
+    }
+
+    // First check if team exists
+    const { data: existingTeam, error: findError } = await supabase
+      .from('teams')
+      .select('id, name, team_number')
+      .eq('id', id)
+      .single();
+
+    if (findError || !existingTeam) {
+      return c.json({ error: 'Team not found' }, 404);
+    }
+
+    const { data, error } = await supabase
+      .from('teams')
+      .update({
+        name: name.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505' && error.message.includes('teams_name_key')) {
+        return c.json({ error: 'Team name already exists' }, 409);
+      }
+      console.error('Database update error:', error);
+      return c.json({ error: 'Failed to update team name' }, 500);
+    }
+
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('Update team name error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// UPDATE TEAM NAME BY TEAM NUMBER - Update just the name of a team using team number
+app.put('/make-server-990f6b7c/teams/by-number/:teamNumber/name', async (c) => {
+  try {
+    const teamNumber = parseInt(c.req.param('teamNumber'));
+    const body = await c.req.json();
+    const { name } = body;
+
+    // Validate team number
+    if (isNaN(teamNumber) || teamNumber <= 0) {
+      return c.json({ error: 'Team number must be a positive integer' }, 400);
+    }
+
+    // Validate required field
+    if (!name?.trim()) {
+      return c.json({ error: 'Team name is required' }, 400);
+    }
+
+    // First check if team exists by team number
+    const { data: existingTeam, error: findError } = await supabase
+      .from('teams')
+      .select('id, name, team_number')
+      .eq('team_number', teamNumber)
+      .single();
+
+    if (findError || !existingTeam) {
+      return c.json({ error: `Team with number ${teamNumber} not found` }, 404);
+    }
+
+    const { data, error } = await supabase
+      .from('teams')
+      .update({
+        name: name.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('team_number', teamNumber)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505' && error.message.includes('teams_name_key')) {
+        return c.json({ error: 'Team name already exists' }, 409);
+      }
+      console.error('Database update error:', error);
+      return c.json({ error: 'Failed to update team name' }, 500);
+    }
+
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('Update team name by number error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // BULK IMPORT - Import teams from CSV
 app.post('/make-server-990f6b7c/teams/import-csv', async (c) => {
   try {
